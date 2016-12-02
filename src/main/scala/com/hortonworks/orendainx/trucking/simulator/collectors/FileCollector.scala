@@ -1,7 +1,7 @@
-package com.hortonworks.orendainx.truck.simulator.collectors
+package com.hortonworks.orendainx.trucking.simulator.collectors
 
 import better.files.File
-import com.hortonworks.orendainx.truck.simulator.collectors.EventCollector.CollectEvent
+import com.hortonworks.orendainx.trucking.simulator.collectors.EventCollector.CollectEvent
 
 /**
   * FileCollector records events to the filesystem, specifically to the file whose path is passed in as the constructor parameter.

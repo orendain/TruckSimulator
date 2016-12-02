@@ -1,7 +1,7 @@
-package com.hortonworks.orendainx.truck.simulator.services
+package com.hortonworks.orendainx.trucking.simulator.services
 
 import better.files.{File, Scannable}
-import com.hortonworks.orendainx.truck.simulator.models.{Location, Route}
+import com.hortonworks.orendainx.trucking.simulator.models.{Location, Route}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer

@@ -1,7 +1,7 @@
-package com.hortonworks.orendainx.truck.simulator
+package com.hortonworks.orendainx.trucking.simulator
 
 import akka.actor.{ActorSystem, Props}
-import com.hortonworks.orendainx.truck.simulator.collectors.FileCollector
+import com.hortonworks.orendainx.trucking.simulator.collectors.FileCollector
 
 import scala.concurrent.duration._
 

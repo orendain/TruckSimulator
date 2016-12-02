@@ -1,4 +1,4 @@
-package com.hortonworks.orendainx.truck.simulator.models
+package com.hortonworks.orendainx.trucking.simulator.models
 
 import java.sql.Timestamp
 

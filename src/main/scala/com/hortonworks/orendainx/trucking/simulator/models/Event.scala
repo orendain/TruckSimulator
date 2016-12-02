@@ -1,4 +1,4 @@
-package com.hortonworks.orendainx.truck.simulator.models
+package com.hortonworks.orendainx.trucking.simulator.models
 
 /**
   * The supertype for all models that expect to pass through the simulator.
