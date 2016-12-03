@@ -10,7 +10,7 @@ import com.hortonworks.orendainx.trucking.simulator.collectors.EventCollector.Co
   */
 class FileCollector(filePath: String) extends EventCollector {
 
-  val writer = File(filePath).newBufferedWriter
+  private val writer = File(filePath).newBufferedWriter
 
   def receive: Unit = {
     case CollectEvent(event) =>
