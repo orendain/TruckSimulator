@@ -15,16 +15,25 @@ import scala.concurrent.duration._
 object SimulatorMain {
 
   def main(args: Array[String]): Unit = {
-    val emitter = _
-    val collector = _
 
-    val eventCount: Int = _
-    val eventDelay: Int = _
-    val eventEmitterCount: Int = _
+    /*
+    com.hortonworks.orendainx.trucking.simulator.emitters.Driver
+     */
+    val emitter = ???
+
+    /*
+    com.hortonworks.orendainx.trucking.simulator.collectors.FileCollector
+    com.hortonworks.orendainx.trucking.simulator.collectors.StandardOutCollector
+     */
+    val collector = ???
+
+    val eventCount: Int = ???
+    val eventDelay: Int = ???
+
+    val emitterCount: Int = ???
 
     val emitterArgs = ???
     val collectorArgs = ???
-
 
     val system = ActorSystem("SimulatorMain")
 

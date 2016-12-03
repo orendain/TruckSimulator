@@ -1,1 +1,1 @@
-# truck-simulator
+# trucking-simulator

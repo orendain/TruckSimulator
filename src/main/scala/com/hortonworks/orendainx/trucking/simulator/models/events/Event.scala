@@ -1,4 +1,4 @@
-package com.hortonworks.orendainx.trucking.simulator.models
+package com.hortonworks.orendainx.trucking.simulator.models.events
 
 /**
   * The supertype for all models that expect to pass through the simulator.
@@ -16,6 +16,13 @@ trait Event extends Serializable {
     * @return A text representation of the data that is appropriate for storage in external sources.
     */
   def toText: String
+
+  /**
+    * Convenience override.  This method redirects to toText.
+    *
+    * @return the output of a call to toText.
+    */
+  override def toString: String = toText
 }
 
 /*
