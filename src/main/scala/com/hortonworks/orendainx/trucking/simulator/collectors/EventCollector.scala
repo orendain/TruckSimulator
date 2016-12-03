@@ -17,6 +17,6 @@ trait EventCollector extends Actor
 
 /*
  * A valid concern could be that by using actors over some singleton service that is equally as threadsafe, we are employing an antipattern.
- * However, considering not all EventCollectors may leverage a datastructure that can be accessed concurrently, using actors
+ * However, considering not all EventCollectors may leverage a data structure that can be accessed concurrently, using actors
  * to regulate resource access is a much better way (and cleaner) way to approach the problem.
  */
