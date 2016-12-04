@@ -1,4 +1,4 @@
-name := "truckingSimulator"
+name := "trucking-simulator"
 
 version := "0.1"
 
@@ -7,6 +7,9 @@ organization := "com.hortonworks.orendainx"
 scalaVersion := "2.11.8"
 
 libraryDependencies ++= Seq(
+
+  "com.hortonworks.orendainx" %% "trucking-shared" % "0.1",
+
   "com.typesafe.akka" %% "akka-actor" % "2.4.14",
 
   "com.typesafe" % "config" % "1.3.1",

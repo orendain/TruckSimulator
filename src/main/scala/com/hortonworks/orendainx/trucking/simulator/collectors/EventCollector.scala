@@ -1,7 +1,7 @@
 package com.hortonworks.orendainx.trucking.simulator.collectors
 
 import akka.actor.Actor
-import com.hortonworks.orendainx.trucking.simulator.models.events.Event
+import com.hortonworks.orendainx.trucking.shared.models.Event
 
 object EventCollector {
   case class CollectEvent(event: Event)

@@ -1,5 +1,6 @@
 package com.hortonworks.orendainx.trucking.simulator.collectors
 
+import akka.actor.Props
 import better.files.File
 import com.hortonworks.orendainx.trucking.simulator.collectors.EventCollector.CollectEvent
 
@@ -8,14 +9,23 @@ import com.hortonworks.orendainx.trucking.simulator.collectors.EventCollector.Co
   *
   * @author Edgar Orendain <edgar@orendainx.com>
   */
-class FileCollector(filePath: String) extends EventCollector {
+object FileCollector {
+  def props(filepath: String) = Props(new FileCollector(filepath))
+}
 
-  private val writer = File(filePath).newBufferedWriter
+class FileCollector(filepath: String) extends EventCollector {
+
+  private val writer = File(filepath).newBufferedWriter
 
   def receive: Unit = {
     case CollectEvent(event) =>
       writer.write(event.toText)
       writer.newLine()
     case _ =>
+  }
+
+  override def postStop(): Unit = {
+    writer.flush()
+    writer.close()
   }
 }

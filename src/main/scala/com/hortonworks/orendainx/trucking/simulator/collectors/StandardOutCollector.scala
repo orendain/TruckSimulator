@@ -1,5 +1,6 @@
 package com.hortonworks.orendainx.trucking.simulator.collectors
 
+import akka.actor.Props
 import com.hortonworks.orendainx.trucking.simulator.collectors.EventCollector.CollectEvent
 
 /**
@@ -7,11 +8,14 @@ import com.hortonworks.orendainx.trucking.simulator.collectors.EventCollector.Co
   *
   * @author Edgar Orendain <edgar@orendainx.com>
   */
-class StandardOutCollector(filePath: String) extends EventCollector {
+object StandardOutCollector {
+  def props = Props(new StandardOutCollector)
+}
+
+class StandardOutCollector extends EventCollector {
 
   def receive: Unit = {
-    case CollectEvent(event) =>
-      println(event.toText)
+    case CollectEvent(event) => println(event.toText)
     case _ =>
   }
 }
