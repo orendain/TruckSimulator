@@ -14,8 +14,9 @@ object StandardOutCollector {
 
 class StandardOutCollector extends EventCollector {
 
-  def receive: Unit = {
+  def receive = {
     case CollectEvent(event) => println(event.toText)
     case _ =>
   }
+
 }

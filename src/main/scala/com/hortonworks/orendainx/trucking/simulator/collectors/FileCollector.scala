@@ -17,7 +17,7 @@ class FileCollector(filepath: String) extends EventCollector {
 
   private val writer = File(filepath).newBufferedWriter
 
-  def receive: Unit = {
+  def receive = {
     case CollectEvent(event) =>
       writer.write(event.toText)
       writer.newLine()

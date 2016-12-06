@@ -3,6 +3,8 @@ package com.hortonworks.orendainx.trucking.simulator.services
 import better.files.{File, Scannable}
 import com.hortonworks.orendainx.trucking.simulator.models.{Location, Route}
 
+import scala.collection.mutable.ListBuffer
+
 /**
   * A parser for a directory storing Route files (.route extension).
   * When parsing the base directory, RouteReader traverses recursively into directories in search of every route file.
@@ -18,13 +20,15 @@ object RouteParser {
     val scanner = file.newScanner
     val routeId = scanner.next[Int]
     val routeName = scanner.tillEndOfLine()
-    val locations = for (loc <- scanner.next[Location]) yield loc
+    val locations = ListBuffer[Location]()
+    while (scanner.hasNext)
+      locations += scanner.next[Location]
 
-    Route(routeId, routeName, locations)
+    Route(routeId, routeName, locations.toList)
   }
 
   // Define Scanner parser for Location
-  private implicit val locationParser = Scannable { scanner =>
+  private implicit val locationParser: Scannable[Location] = Scannable { scanner =>
     Location(scanner.next[String], scanner.next[String])
   }
 }

@@ -4,12 +4,12 @@ import java.sql.Timestamp
 import java.util.Date
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import com.hortonworks.orendainx.trucking.shared.models.TruckingEvent
+import com.hortonworks.orendainx.trucking.shared.models.{TruckingEvent, TruckingEventTypes}
 import com.hortonworks.orendainx.trucking.simulator.collectors.EventCollector.CollectEvent
 import com.hortonworks.orendainx.trucking.simulator.models.{Driver, Location, Route, Truck}
 import com.typesafe.config.Config
 
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable
 import scala.util.Random
 
 /**
@@ -21,48 +21,48 @@ object DriverActor {
   case class NewRoute(route: Route)
   case class NewTruck(truck: Truck)
 
-  def props(driver: Driver)(implicit dispatcher: ActorRef, config: Config, eventCollector: ActorRef) =
-    Props(new DriverActor(driver))
+  def props(driver: Driver, dispatcher: ActorRef, eventCollector: ActorRef)(implicit config: Config) =
+    Props(new DriverActor(driver, dispatcher, eventCollector))
 }
 
-class DriverActor(driver: Driver)(implicit dispatcher: ActorRef, config: Config, eventCollector: ActorRef) extends Actor with ActorLogging {
+class DriverActor(driver: Driver, dispatcher: ActorRef, eventCollector: ActorRef)(implicit config: Config) extends Actor with ActorLogging {
 
   import DriverActor._
 
   var truck: Option[Truck] = None
   var route: Option[Route] = None
-  var locations = ListBuffer.empty[Location]
+  var locations = List.empty[Location]
+  var locationsLeft = mutable.Buffer.empty[Location]
 
-  val SpeedingThreshold = config.getInt("driving.speeding-threshold")
-  val MaxRouteCompletedCount = config.getInt("driving.max-route-completed-count")
+  // TODO: config only being used for 2 options, and they're shared among all users.  Factor this out.
+  val SpeedingThreshold = config.getInt("simulator.speeding-threshold")
+  val MaxRouteCompletedCount = config.getInt("simulator.max-route-completed-count")
 
   var driveCount = 0
   var routeCompletedCount = 0
 
-  dispatcher ! DispatcherActor.RequestRoute
-  dispatcher ! DispatcherActor.RequestTruck
+  dispatcher ! TruckAndRouteDepot.RequestRoute
+  dispatcher ! TruckAndRouteDepot.RequestTruck
   context become waitingOnDispatcher
 
-  override def receive: Unit = {
-    log.info("Should never see this message.")
+  def receive = {
+    case _ => log.info("Should never see this message.")
   }
 
   def driverActive: Receive = {
     case Drive =>
 
       driveCount += 1
-      val currentLoc = locations.remove(0)
+      val currentLoc = locationsLeft.remove(0)
 
       val speed =
         driver.drivingPattern.minSpeed + Random.nextInt(driver.drivingPattern.maxSpeed - driver.drivingPattern.minSpeed + 1)
 
       val eventType =
-        if (speed >= SpeedingThreshold || driveCount % driver.drivingPattern.riskFrequency == 0) {
-        // TODO: Speed or random violation
-          "speeding"
-      } else {
-        "normal"
-      }
+        if (speed >= SpeedingThreshold || driveCount % driver.drivingPattern.riskFrequency == 0)
+          TruckingEventTypes.AllTypes(Random.nextInt(TruckingEventTypes.AllTypes.length))
+        else
+          TruckingEventTypes.Normal
 
       // Create event and emit it
       val eventTime = new Timestamp(new Date().getTime)
@@ -70,17 +70,19 @@ class DriverActor(driver: Driver)(implicit dispatcher: ActorRef, config: Config,
       eventCollector ! CollectEvent(event)
 
       // If driver completed the route, switch trucks
-      if (locations.isEmpty) {
-        dispatcher ! DispatcherActor.RequestTruck
-        dispatcher ! DispatcherActor.ReturnTruck(truck.get)
+      if (locationsLeft.isEmpty) {
+        dispatcher ! TruckAndRouteDepot.RequestTruck
+        dispatcher ! TruckAndRouteDepot.ReturnTruck(truck.get)
 
         // If route traveled too many times, switch routes
         routeCompletedCount += 1
         if (routeCompletedCount > MaxRouteCompletedCount)
-          dispatcher ! DispatcherActor.RequestRoute
-          // TODO: need to have route.get = None, or context will prematurely swtich
+          "s"
+        //dispatcher ! DispatcherActor.RequestRoute
+        // TODO: need to have route.get = None, or context will prematurely switch
         else {
-          // TODO: If using same route, get new set of locations from route, but in reverse
+          locations = locations.reverse
+          locationsLeft = locations.toBuffer
         }
 
         context become waitingOnDispatcher
@@ -94,10 +96,14 @@ class DriverActor(driver: Driver)(implicit dispatcher: ActorRef, config: Config,
       truck = Some(newTruck)
       inspectState()
     case NewRoute(newRoute) =>
-      if (route.nonEmpty) dispatcher ! DispatcherActor.ReturnRoute(route.get)
+      if (route.nonEmpty) dispatcher ! TruckAndRouteDepot.ReturnRoute(route.get)
       route = Some(newRoute)
+      locations = route.get.locations
+      locationsLeft = locations.toBuffer
       inspectState()
     case Drive =>
+      // TODO: should not requeue because then all same timestamp, but need to make sure all events are generated for driver
+      // TODO: implement exactly-n-times in coordinator.
       log.info("Drive message while waiting on dispatcher, ignoring.")
     case _ =>
   }

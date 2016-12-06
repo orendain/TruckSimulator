@@ -11,7 +11,7 @@ import scala.util.Random
 /**
   * @author Edgar Orendain <edgar@orendainx.com>
   */
-object DispatcherActor {
+object TruckAndRouteDepot {
   case object RequestTruck
   case object RequestRoute
 
@@ -19,18 +19,18 @@ object DispatcherActor {
   case class ReturnRoute(route: Route)
 
   def props()(implicit config: Config) =
-    Props(new DispatcherActor())
+    Props(new TruckAndRouteDepot())
 }
 
-class DispatcherActor(implicit config: Config) extends Actor with ActorLogging {
+class TruckAndRouteDepot(implicit config: Config) extends Actor with ActorLogging {
 
-  import DispatcherActor._
+  import TruckAndRouteDepot._
 
   private val trucksAvailable = mutable.Queue.empty[Truck]
-  private val routesAvailable = RouteParser(config.getString("simulation.route-directory")).routes.toBuffer
-  private val newTruckIds = Random.shuffle(1 to config.getInt("dispatch.max-trucks")).toBuffer
+  private val routesAvailable = RouteParser(config.getString("options.route-directory")).routes.toBuffer
+  private val newTruckIds = Random.shuffle(1 to config.getInt("simulator.max-trucks")).toBuffer
 
-  override def receive: Unit = {
+  def receive = {
     case RequestTruck =>
       if (trucksAvailable.nonEmpty) sender() ! trucksAvailable.dequeue()
       else sender() ! newTruckIds.remove(0)
