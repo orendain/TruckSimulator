@@ -34,11 +34,11 @@ class DriverCoordinator(drivers: Seq[Driver], dispatcher: ActorRef, eventCollect
   val eventDelay = config.getInt("simulator.event-delay")
   val eventDelayJitter = config.getInt("simulator.event-delay-jitter")
 
-  // Insert each new driver into the simulation, and tell them to "Drive" after every short delay
+  // Create new drivers and initialize a counter for each
   val driverRefs = drivers.map { driver => context.actorOf(DriverActor.props(driver, dispatcher, eventCollector)) }
-  val driveCounters = mutable.Map(driverRefs.zip(Seq.fill(driverRefs.length)(0)): _*)
+  val driveCounters = mutable.Map(driverRefs.map((_, 0)): _*)
 
-  // Start each driver
+  // Insert each new driver into the simulation and begin "ticking"
   driverRefs.foreach { driverRef =>
     context.system.scheduler.scheduleOnce(Random.nextInt(eventDelay + eventDelayJitter) milliseconds, self, TickDriver(driverRef))
   }
