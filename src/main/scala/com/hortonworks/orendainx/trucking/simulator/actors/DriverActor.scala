@@ -21,11 +21,11 @@ object DriverActor {
   case class NewRoute(route: Route)
   case class NewTruck(truck: Truck)
 
-  def props(driver: Driver, dispatcher: ActorRef, eventCollector: ActorRef)(implicit config: Config) =
-    Props(new DriverActor(driver, dispatcher, eventCollector))
+  def props(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(implicit config: Config) =
+    Props(new DriverActor(driver, depot, eventCollector))
 }
 
-class DriverActor(driver: Driver, dispatcher: ActorRef, eventCollector: ActorRef)(implicit config: Config) extends Actor with ActorLogging {
+class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(implicit config: Config) extends Actor with ActorLogging {
 
   import DriverActor._
 
@@ -41,9 +41,9 @@ class DriverActor(driver: Driver, dispatcher: ActorRef, eventCollector: ActorRef
   var driveCount = 0
   var routeCompletedCount = 0
 
-  dispatcher ! TruckAndRouteDepot.RequestRoute
-  dispatcher ! TruckAndRouteDepot.RequestTruck
-  context become waitingOnDispatcher
+  depot ! TruckAndRouteDepot.RequestRoute
+  depot ! TruckAndRouteDepot.RequestTruck
+  context become waitingOndepot
 
   def receive = {
     case _ => log.info("Should never see this message.")
@@ -71,32 +71,32 @@ class DriverActor(driver: Driver, dispatcher: ActorRef, eventCollector: ActorRef
 
       // If driver completed the route, switch trucks
       if (locationsLeft.isEmpty) {
-        dispatcher ! TruckAndRouteDepot.RequestTruck
-        dispatcher ! TruckAndRouteDepot.ReturnTruck(truck.get)
+        depot ! TruckAndRouteDepot.RequestTruck
+        depot ! TruckAndRouteDepot.ReturnTruck(truck.get)
 
         // If route traveled too many times, switch routes
         routeCompletedCount += 1
         if (routeCompletedCount > MaxRouteCompletedCount)
           "s"
-        //dispatcher ! DispatcherActor.RequestRoute
+        //depot ! depotActor.RequestRoute
         // TODO: need to have route.get = None, or context will prematurely switch
         else {
           locations = locations.reverse
           locationsLeft = locations.toBuffer
         }
 
-        context become waitingOnDispatcher
+        context become waitingOndepot
       }
 
     case _ =>
   }
 
-  def waitingOnDispatcher: Receive = {
+  def waitingOndepot: Receive = {
     case NewTruck(newTruck) =>
       truck = Some(newTruck)
       inspectState()
     case NewRoute(newRoute) =>
-      if (route.nonEmpty) dispatcher ! TruckAndRouteDepot.ReturnRoute(route.get)
+      if (route.nonEmpty) depot ! TruckAndRouteDepot.ReturnRoute(route.get)
       route = Some(newRoute)
       locations = route.get.locations
       locationsLeft = locations.toBuffer
@@ -104,7 +104,7 @@ class DriverActor(driver: Driver, dispatcher: ActorRef, eventCollector: ActorRef
     case Drive =>
       // TODO: should not requeue because then all same timestamp, but need to make sure all events are generated for driver
       // TODO: implement exactly-n-times in coordinator.
-      log.info("Drive message while waiting on dispatcher, ignoring.")
+      log.info("Drive message while waiting on depot, ignoring.")
     case _ =>
   }
 

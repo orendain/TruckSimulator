@@ -15,4 +15,4 @@ libraryDependencies ++= Seq(
   "com.github.pathikrit" %% "better-files" % "2.16.0"
 )
 
-//scalacOptions ++= Seq("-Ylog-classpath")
+scalacOptions ++= Seq("-feature")

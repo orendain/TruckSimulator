@@ -1,19 +1,13 @@
 package com.hortonworks.orendainx.trucking.simulator.actors
 
 
-import java.sql.Timestamp
-import java.util.Date
-
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import com.hortonworks.orendainx.trucking.shared.models.{TruckingEvent, TruckingEventTypes}
-import com.hortonworks.orendainx.trucking.simulator.collectors.EventCollector.CollectEvent
-import com.hortonworks.orendainx.trucking.simulator.models.{Driver, Location, Route, Truck}
+import com.hortonworks.orendainx.trucking.simulator.models.Driver
 import com.typesafe.config.Config
 
 import scala.collection.mutable
-import scala.util.Random
-
 import scala.concurrent.duration._
+import scala.util.Random
 
 /**
   * @author Edgar Orendain <edgar@orendainx.com>
@@ -21,13 +15,15 @@ import scala.concurrent.duration._
 object DriverCoordinator {
   case class TickDriver(driverRef: ActorRef)
 
-  def props(drivers: Seq[Driver], dispatcher: ActorRef, eventCollector: ActorRef)(implicit config: Config) =
-    Props(new DriverCoordinator(drivers, dispatcher, eventCollector))
+  def props(drivers: Seq[Driver], depot: ActorRef, eventCollector: ActorRef)(implicit config: Config) =
+    Props(new DriverCoordinator(drivers, depot, eventCollector))
 }
 
-class DriverCoordinator(drivers: Seq[Driver], dispatcher: ActorRef, eventCollector: ActorRef)(implicit config: Config) extends Actor with ActorLogging {
+class DriverCoordinator(drivers: Seq[Driver], depot: ActorRef, eventCollector: ActorRef)(implicit config: Config) extends Actor with ActorLogging {
 
+  // For receive messages and an execution context
   import DriverCoordinator._
+  import context.dispatcher
 
   // Extract some configs
   val eventCount = config.getInt("options.event-count")
@@ -35,12 +31,12 @@ class DriverCoordinator(drivers: Seq[Driver], dispatcher: ActorRef, eventCollect
   val eventDelayJitter = config.getInt("simulator.event-delay-jitter")
 
   // Create new drivers and initialize a counter for each
-  val driverRefs = drivers.map { driver => context.actorOf(DriverActor.props(driver, dispatcher, eventCollector)) }
+  val driverRefs = drivers.map { driver => context.actorOf(DriverActor.props(driver, depot, eventCollector)) }
   val driveCounters = mutable.Map(driverRefs.map((_, 0)): _*)
 
   // Insert each new driver into the simulation and begin "ticking"
   driverRefs.foreach { driverRef =>
-    context.system.scheduler.scheduleOnce(Random.nextInt(eventDelay + eventDelayJitter) milliseconds, self, TickDriver(driverRef))
+    context.system.scheduler.scheduleOnce(Random.nextInt(eventDelay + eventDelayJitter).milliseconds, self, TickDriver(driverRef))
   }
 
   def receive = {
@@ -48,7 +44,7 @@ class DriverCoordinator(drivers: Seq[Driver], dispatcher: ActorRef, eventCollect
       if (driveCounters(driverRef) < eventCount) {
         driverRef ! DriverActor.Drive
         driveCounters.update(driverRef, driveCounters(driverRef)-1)
-        context.system.scheduler.scheduleOnce(eventDelay + Random.nextInt(eventDelayJitter) milliseconds, self, TickDriver(driverRef))
+        context.system.scheduler.scheduleOnce((eventDelay + Random.nextInt(eventDelayJitter)).milliseconds, self, TickDriver(driverRef))
       }
     case _ => log.info("Received an unexpected message.")
   }
