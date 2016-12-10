@@ -26,31 +26,21 @@ class TruckAndRouteDepot(implicit config: Config) extends Actor with ActorLoggin
 
   import TruckAndRouteDepot._
 
-  private val trucksAvailable = mutable.Queue.empty[Truck]
-  log.debug("Request all routes")
-  private val routesAvailable = RouteParser(config.getString("options.route-directory"))(context.system).routes.toBuffer
-  log.debug("Received all routes")
-  private val newTruckIds = Random.shuffle(1 to config.getInt("simulator.max-trucks")).toBuffer
+  private val trucksAvailable = Random.shuffle(1 to config.getInt("simulator.trucks-available")).map(Truck).toBuffer
+  private val routesAvailable = RouteParser(config.getString("options.route-directory")).routes.toBuffer
+
+  log.debug("Routes and trucks ready.")
 
   def receive = {
     case RequestTruck =>
-      log.debug("Request for truck received")
-      if (trucksAvailable.nonEmpty) {
-        val truck = trucksAvailable.dequeue()
-        log.debug(s"Sending available truck $truck")
-        sender() ! DriverActor.NewTruck(truck)
-      }
-      else {
-        val truck = newTruckIds.remove(0)
-        log.debug(s"Sending new truck $truck")
-        sender() ! DriverActor.NewTruck(Truck(truck))
-      }
+      if (trucksAvailable.nonEmpty) sender() ! DriverActor.NewTruck(trucksAvailable.remove(0))
+      else self forward RequestTruck // No trucks to give out, requeue request
 
     case RequestRoute =>
       if (routesAvailable.nonEmpty) sender() ! DriverActor.NewRoute(routesAvailable.remove(0))
-      else self forward RequestRoute // Requeue message for later processing
+      else self forward RequestRoute // No route to give out, requeue request
 
-    case ReturnTruck(truck) => trucksAvailable.enqueue(truck)
+    case ReturnTruck(truck) => trucksAvailable.append(truck)
     case ReturnRoute(route) => routesAvailable.append(route)
   }
 }

@@ -15,14 +15,12 @@ import scala.collection.mutable.ListBuffer
   */
 object RouteParser {
 
-  // TODO: for testing, hack
-  def apply(directoryPath: String)(implicit system: ActorSystem) = {
-    //val path = getClass.getResource(directoryPath).getPath
+  // TODO: fix, obviously :p
+  def apply(directoryPath: String) = {
     val path = s"/Users/eorendain/Documents/trucking/trucking-simulator/src/main/resources/routes/$directoryPath"
     new RouteParser(path)
   }
 
-  // TODO: Can futurize.
   def parseFile(file: File): Route = {
     val scanner = file.newScanner
     val routeId = scanner.next[Int]
@@ -40,24 +38,16 @@ object RouteParser {
   }
 }
 
-// TODO: implicit for debugging, remove.
-class RouteParser(directoryPath: String)(implicit system: ActorSystem) {
-
-  val log = Logging(system, "RouteParser")
-
-  log.debug(s"Path is $directoryPath")
+class RouteParser(directoryPath: String) {
 
   lazy val routes: List[Route] = {
     val directory = File(directoryPath)
 
-    if (directory.isDirectory) {
-      log.debug(s"parsing!")
+    if (directory.isDirectory)
       directory.listRecursively
         .filter(_.extension.contains(".route"))
         .map(RouteParser.parseFile).toList
-    } else {
-      log.debug(s"problem parsing!")
+    else
       List.empty[Route]
-    }
   }
 }
