@@ -1,7 +1,9 @@
 package com.hortonworks.orendainx.trucking.simulator.services
 
+import akka.actor.ActorSystem
 import better.files.{File, Scannable}
 import com.hortonworks.orendainx.trucking.simulator.models.{Location, Route}
+import akka.event.Logging
 
 import scala.collection.mutable.ListBuffer
 
@@ -13,7 +15,12 @@ import scala.collection.mutable.ListBuffer
   */
 object RouteParser {
 
-  def apply(directoryPath: String) = new RouteParser(directoryPath)
+  // TODO: for testing, hack
+  def apply(directoryPath: String)(implicit system: ActorSystem) = {
+    //val path = getClass.getResource(directoryPath).getPath
+    val path = s"/Users/eorendain/Documents/trucking/trucking-simulator/src/main/resources/routes/$directoryPath"
+    new RouteParser(path)
+  }
 
   // TODO: Can futurize.
   def parseFile(file: File): Route = {
@@ -33,16 +40,24 @@ object RouteParser {
   }
 }
 
-class RouteParser(directoryPath: String) {
+// TODO: implicit for debugging, remove.
+class RouteParser(directoryPath: String)(implicit system: ActorSystem) {
+
+  val log = Logging(system, "RouteParser")
+
+  log.debug(s"Path is $directoryPath")
 
   lazy val routes: List[Route] = {
     val directory = File(directoryPath)
 
     if (directory.isDirectory) {
+      log.debug(s"parsing!")
       directory.listRecursively
         .filter(_.extension.contains(".route"))
         .map(RouteParser.parseFile).toList
-    } else
+    } else {
+      log.debug(s"problem parsing!")
       List.empty[Route]
+    }
   }
 }

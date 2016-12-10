@@ -43,6 +43,8 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
 
   depot ! TruckAndRouteDepot.RequestRoute
   depot ! TruckAndRouteDepot.RequestTruck
+
+  log.debug("Changing context just because.")
   context become waitingOndepot
 
   def receive = {
@@ -52,7 +54,11 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
   def driverActive: Receive = {
     case Drive =>
 
+      log.debug("TickDriver event processing.")
+
       driveCount += 1
+
+      // TODO: received indexoutofbounds ... must be route issue not being replaced
       val currentLoc = locationsLeft.remove(0)
 
       val speed =
@@ -85,6 +91,7 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
           locationsLeft = locations.toBuffer
         }
 
+        log.debug("Changing context to waiting!")
         context become waitingOndepot
       }
 
@@ -95,19 +102,23 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
     case NewTruck(newTruck) =>
       truck = Some(newTruck)
       inspectState()
+      log.debug("Received new truck")
     case NewRoute(newRoute) =>
       if (route.nonEmpty) depot ! TruckAndRouteDepot.ReturnRoute(route.get)
       route = Some(newRoute)
       locations = route.get.locations
       locationsLeft = locations.toBuffer
       inspectState()
+      log.debug("Received new route")
     case Drive =>
       // TODO: should not requeue because then all same timestamp, but need to make sure all events are generated for driver
       // TODO: implement exactly-n-times in coordinator.
-      log.info("Drive message while waiting on depot, ignoring.")
+      log.debug("Drive message while waiting on depot, ignoring.")
     case _ =>
   }
 
-  def inspectState(): Unit =
+  def inspectState(): Unit = {
+    log.debug("POSSIBLY changing context to normal!")
     if (truck.nonEmpty && route.nonEmpty) context become driverActive
+  }
 }

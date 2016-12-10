@@ -41,12 +41,17 @@ class DriverCoordinator(drivers: Seq[Driver], depot: ActorRef, eventCollector: A
 
   def receive = {
     case TickDriver(driverRef) =>
+      //log.debug("TickDriver event processing.")
       if (driveCounters(driverRef) < eventCount) {
         driverRef ! DriverActor.Drive
         driveCounters.update(driverRef, driveCounters(driverRef)-1)
         context.system.scheduler.scheduleOnce((eventDelay + Random.nextInt(eventDelayJitter)).milliseconds, self, TickDriver(driverRef))
       }
     case _ => log.info("Received an unexpected message.")
+  }
+
+  override def postStop() = {
+    log.debug("stopping!")
   }
 
 }

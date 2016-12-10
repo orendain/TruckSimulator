@@ -7,6 +7,8 @@ import com.hortonworks.orendainx.trucking.simulator.models.{Driver, DrivingPatte
 import com.typesafe.config.ConfigFactory
 
 import scala.collection.JavaConversions._
+import scala.concurrent.Await
+import scala.concurrent.duration._
 
 /**
   * Entry point for the simulator.
@@ -56,5 +58,11 @@ object SimulatorMain {
 
     // Create a DriverCoordinator, beginning the simulation
     system.actorOf(DriverCoordinator.props(drivers, dispatcher, eventCollector))
+
+    // Ensure that the actor system is properly terminated when the simulator is shutdown.
+    scala.sys.addShutdownHook {
+      system.terminate()
+      Await.result(system.whenTerminated, 15.seconds)
+    }
   }
 }

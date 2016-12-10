@@ -16,3 +16,5 @@ libraryDependencies ++= Seq(
 )
 
 scalacOptions ++= Seq("-feature")
+
+//cancelable in Global := true
