@@ -5,15 +5,14 @@ import com.hortonworks.orendainx.trucking.simulator.models.{Route, Truck}
 import com.hortonworks.orendainx.trucking.simulator.services.RouteParser
 import com.typesafe.config.Config
 
-import scala.collection.mutable
 import scala.util.Random
 
 /**
   * @author Edgar Orendain <edgar@orendainx.com>
   */
 object TruckAndRouteDepot {
-  case class RequestTruck(previous: Option[Truck] = None)
-  case class RequestRoute(previous: Option[Truck] = None)
+  case class RequestTruck(previous: Option[Truck])
+  case class RequestRoute(previous: Option[Route])
 
   case class ReturnTruck(truck: Truck)
   case class ReturnRoute(route: Route)
@@ -31,12 +30,19 @@ class TruckAndRouteDepot(implicit config: Config) extends Actor with ActorLoggin
 
   log.debug("Routes and trucks ready.")
 
+  // TODO: should not return something that was just sent back, to the same driver
   def receive = {
-    case RequestTruck =>
-      if (trucksAvailable.nonEmpty) sender() ! DriverActor.NewTruck(trucksAvailable.remove(0))
-      else self forward RequestTruck // No trucks to give out, requeue request
+    case RequestTruck(previous) =>
+      if (previous.isEmpty) {
+        if (trucksAvailable.nonEmpty) sender() ! DriverActor.NewTruck(trucksAvailable.remove(0))
+        else self forward RequestTruck(previous) // No trucks to give out, requeue request
+      } else {
+        val ind = trucksAvailable.indexWhere(_ != previous.get)
+        if (ind >= 0) sender() ! DriverActor.NewTruck(trucksAvailable.remove(ind))
+        else self forward RequestTruck(previous)
+      }
 
-    case RequestRoute =>
+    case RequestRoute(previous) =>
       if (routesAvailable.nonEmpty) sender() ! DriverActor.NewRoute(routesAvailable.remove(0))
       else self forward RequestRoute // No route to give out, requeue request
 

@@ -49,8 +49,8 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
   var driveCount = 0
   var routeCompletedCount = 0
 
-  depot ! TruckAndRouteDepot.RequestRoute
-  depot ! TruckAndRouteDepot.RequestTruck
+  depot ! TruckAndRouteDepot.RequestRoute(previousRoute)
+  depot ! TruckAndRouteDepot.RequestTruck(previousTruck)
 
   log.debug("Changing context just because.")
   context become waitingOndepot
@@ -61,14 +61,10 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
 
   def driverActive: Receive = {
     case Drive =>
-
       log.debug("TickDriver event processing.")
-
       driveCount += 1
 
-      // TODO: received indexoutofbounds ... must be route issue not being replaced
       val currentLoc = locationsLeft.remove(0)
-
       val speed =
         driver.drivingPattern.minSpeed + Random.nextInt(driver.drivingPattern.maxSpeed - driver.drivingPattern.minSpeed + 1)
 
@@ -87,16 +83,17 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
       if (locationsLeft.isEmpty) {
         previousTruck = truck
         truck = None
-        depot ! TruckAndRouteDepot.ReturnTruck(truck.get)
-        depot ! TruckAndRouteDepot.RequestTruck
+        depot ! TruckAndRouteDepot.ReturnTruck(previousTruck.get)
+        depot ! TruckAndRouteDepot.RequestTruck(previousTruck)
 
         // If route traveled too many times, switch routes
         routeCompletedCount += 1
-        if (routeCompletedCount > MaxRouteCompletedCount)
-          "s"
-        //depot ! depotActor.RequestRoute
-        // TODO: need to have route.get = None, or context will prematurely switch
-        else {
+        if (routeCompletedCount > MaxRouteCompletedCount) {
+          previousRoute = route
+          route = None
+          depot ! TruckAndRouteDepot.ReturnRoute(previousRoute.get)
+          depot ! TruckAndRouteDepot.RequestRoute(previousRoute)
+        } else {
           locations = locations.reverse
           locationsLeft = locations.toBuffer
         }
@@ -112,14 +109,14 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
     case NewTruck(newTruck) =>
       truck = Some(newTruck)
       inspectState()
-      log.debug("Received new truck")
+      log.debug(s"Received new truck: ${newTruck.id}")
     case NewRoute(newRoute) =>
       if (route.nonEmpty) depot ! TruckAndRouteDepot.ReturnRoute(route.get)
       route = Some(newRoute)
       locations = route.get.locations
       locationsLeft = locations.toBuffer
       inspectState()
-      log.debug("Received new route")
+      log.debug(s"Received new route: ${newRoute.name}")
     case Drive =>
       // TODO: should not requeue because then all same timestamp, but need to make sure all events are generated for driver
       // TODO: implement exactly-n-times in coordinator.
