@@ -9,6 +9,7 @@ import com.typesafe.config.ConfigFactory
 import scala.collection.JavaConversions._
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.Random
 
 /**
   * Entry point for the simulator.
@@ -55,7 +56,8 @@ object SimulatorMain {
       // If we need more drivers, generate "normal" drivers. Or if we need to remove some special drivers, do so.
       if (specialDrivers.length < driverCount) {
         val newDrivers = (specialDrivers.length to driverCount).map { newId =>
-          Driver(newId, "NormalDriverName", patterns("normal")) // TODO: generate driver names
+          val randomDriverName = Random.nextString(config.getInt("simulator.driver-name-length"))
+          Driver(newId, randomDriverName, patterns("normal"))
         }
         specialDrivers ++ newDrivers
       } else
