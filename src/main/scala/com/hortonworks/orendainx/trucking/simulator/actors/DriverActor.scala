@@ -29,10 +29,18 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
 
   import DriverActor._
 
+  //
   var truck: Option[Truck] = None
   var route: Option[Route] = None
+
+  // Previous truck/route
+  var previousTruck: Option[Truck] = None
+  var previousRoute: Option[Route] = None
+
+  //
   var locations = List.empty[Location]
   var locationsLeft = mutable.Buffer.empty[Location]
+
 
   // TODO: config only being used for 2 options, and they're shared among all users.  Factor this out.
   val SpeedingThreshold = config.getInt("simulator.speeding-threshold")
@@ -77,8 +85,10 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
 
       // If driver completed the route, switch trucks
       if (locationsLeft.isEmpty) {
-        depot ! TruckAndRouteDepot.RequestTruck
+        previousTruck = truck
+        truck = None
         depot ! TruckAndRouteDepot.ReturnTruck(truck.get)
+        depot ! TruckAndRouteDepot.RequestTruck
 
         // If route traveled too many times, switch routes
         routeCompletedCount += 1

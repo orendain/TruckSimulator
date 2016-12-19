@@ -41,7 +41,6 @@ class DriverCoordinator(drivers: Seq[Driver], depot: ActorRef, eventCollector: A
 
   def receive = {
     case TickDriver(driverRef) =>
-      //log.debug("TickDriver event processing.")
       if (driveCounters(driverRef) < eventCount) {
         driverRef ! DriverActor.Drive
         driveCounters.update(driverRef, driveCounters(driverRef)-1)

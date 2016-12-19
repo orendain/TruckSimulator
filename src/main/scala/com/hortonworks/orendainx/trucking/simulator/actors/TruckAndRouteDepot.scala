@@ -12,8 +12,8 @@ import scala.util.Random
   * @author Edgar Orendain <edgar@orendainx.com>
   */
 object TruckAndRouteDepot {
-  case object RequestTruck
-  case object RequestRoute
+  case class RequestTruck(previous: Option[Truck] = None)
+  case class RequestRoute(previous: Option[Truck] = None)
 
   case class ReturnTruck(truck: Truck)
   case class ReturnRoute(route: Route)

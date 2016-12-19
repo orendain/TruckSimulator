@@ -16,7 +16,7 @@ object FileCollector {
 
 class FileCollector(filepath: String) extends EventCollector with ActorLogging {
 
-  private val writer = File(filepath).newBufferedWriter
+  private val writer = File(filepath).createIfNotExists(createParents = true).newBufferedWriter
 
   def receive = {
     case CollectEvent(event) =>
