@@ -61,8 +61,8 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
 
   def driverActive: Receive = {
     case Drive =>
-      log.debug("TickDriver event processing.")
       driveCount += 1
+      log.debug(s"TickDriver event processing: #$driveCount")
 
       val currentLoc = locationsLeft.remove(0)
       val speed =

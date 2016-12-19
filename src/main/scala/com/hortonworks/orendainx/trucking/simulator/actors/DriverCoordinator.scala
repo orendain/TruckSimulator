@@ -1,11 +1,12 @@
 package com.hortonworks.orendainx.trucking.simulator.actors
 
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props}
 import com.hortonworks.orendainx.trucking.simulator.models.Driver
 import com.typesafe.config.Config
 
 import scala.collection.mutable
+import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -34,7 +35,7 @@ class DriverCoordinator(drivers: Seq[Driver], depot: ActorRef, eventCollector: A
   val driverRefs = drivers.map { driver => context.actorOf(DriverActor.props(driver, depot, eventCollector)) }
   val driveCounters = mutable.Map(driverRefs.map((_, 0)): _*)
 
-  // Insert each new driver into the simulation and begin "ticking"
+  // Insert each new driver into the simulation (at a random schedule point) and begin "ticking"
   driverRefs.foreach { driverRef =>
     context.system.scheduler.scheduleOnce(Random.nextInt(eventDelay + eventDelayJitter).milliseconds, self, TickDriver(driverRef))
   }
@@ -43,8 +44,11 @@ class DriverCoordinator(drivers: Seq[Driver], depot: ActorRef, eventCollector: A
     case TickDriver(driverRef) =>
       if (driveCounters(driverRef) < eventCount) {
         driverRef ! DriverActor.Drive
-        driveCounters.update(driverRef, driveCounters(driverRef)-1)
+        driveCounters.update(driverRef, driveCounters(driverRef)+1)
         context.system.scheduler.scheduleOnce((eventDelay + Random.nextInt(eventDelayJitter)).milliseconds, self, TickDriver(driverRef))
+      } else {
+        // If a driver has finished their route, see if all drivers have.  If so, terminate the simulation.
+        if (!driveCounters.values.exists(_ < eventCount)) context.system.terminate()
       }
     case _ => log.info("Received an unexpected message.")
   }
