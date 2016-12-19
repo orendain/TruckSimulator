@@ -29,20 +29,17 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
 
   import DriverActor._
 
-  //
+  // Current and previous truck/routes
   var truck: Option[Truck] = None
   var route: Option[Route] = None
-
-  // Previous truck/route
   var previousTruck: Option[Truck] = None
   var previousRoute: Option[Route] = None
 
-  //
+  // Locations this driver visits
   var locations = List.empty[Location]
   var locationsLeft = mutable.Buffer.empty[Location]
 
-
-  // TODO: config only being used for 2 options, and they're shared among all users.  Factor this out.
+  // TODO: config only being used for 2 options, and they're shared among all users. Consider factoring out.
   val SpeedingThreshold = config.getInt("simulator.speeding-threshold")
   val MaxRouteCompletedCount = config.getInt("simulator.max-route-completed-count")
 
@@ -52,17 +49,16 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
   depot ! TruckAndRouteDepot.RequestRoute(previousRoute)
   depot ! TruckAndRouteDepot.RequestTruck(previousTruck)
 
-  log.debug("Changing context just because.")
   context become waitingOndepot
 
   def receive = {
-    case _ => log.info("Should never see this message.")
+    case _ => log.error("This message should never be seen.")
   }
 
   def driverActive: Receive = {
     case Drive =>
       driveCount += 1
-      log.debug(s"TickDriver event processing: #$driveCount")
+      log.info(s"Processing drive event #$driveCount")
 
       val currentLoc = locationsLeft.remove(0)
       val speed =
@@ -98,34 +94,28 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
           locationsLeft = locations.toBuffer
         }
 
-        log.debug("Changing context to waiting!")
+        log.info("Changing context to waitingOnDepot")
         context become waitingOndepot
       }
-
-    case _ =>
   }
 
   def waitingOndepot: Receive = {
     case NewTruck(newTruck) =>
       truck = Some(newTruck)
       inspectState()
-      log.debug(s"Received new truck: ${newTruck.id}")
+      log.info(s"Received new truck with id ${newTruck.id}")
     case NewRoute(newRoute) =>
       if (route.nonEmpty) depot ! TruckAndRouteDepot.ReturnRoute(route.get)
       route = Some(newRoute)
       locations = route.get.locations
       locationsLeft = locations.toBuffer
       inspectState()
-      log.debug(s"Received new route: ${newRoute.name}")
+      log.info(s"Received new route: ${newRoute.name}")
     case Drive =>
       // TODO: should not requeue because then all same timestamp, but need to make sure all events are generated for driver
       // TODO: implement exactly-n-times in coordinator.
-      log.debug("Drive message while waiting on depot, ignoring.")
-    case _ =>
+      log.debug("Received Drive command while waiting on resources. Ignoring command, lost generated event.")
   }
 
-  def inspectState(): Unit = {
-    log.debug("POSSIBLY changing context to normal!")
-    if (truck.nonEmpty && route.nonEmpty) context become driverActive
-  }
+  def inspectState(): Unit = if (truck.nonEmpty && route.nonEmpty) context become driverActive
 }

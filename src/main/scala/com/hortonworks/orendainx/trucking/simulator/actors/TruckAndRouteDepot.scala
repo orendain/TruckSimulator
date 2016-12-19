@@ -28,7 +28,7 @@ class TruckAndRouteDepot(implicit config: Config) extends Actor with ActorLoggin
   private val trucksAvailable = Random.shuffle(1 to config.getInt("simulator.trucks-available")).map(Truck).toBuffer
   private val routesAvailable = RouteParser(config.getString("options.route-directory")).routes.toBuffer
 
-  log.info("Trucks and routes initialized and ready for deployment.")
+  log.info("Trucks and routes initialized and ready for deployment")
 
   def receive = {
     case RequestTruck(previous) =>

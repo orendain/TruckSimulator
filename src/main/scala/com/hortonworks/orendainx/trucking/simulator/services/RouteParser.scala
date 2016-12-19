@@ -1,9 +1,7 @@
 package com.hortonworks.orendainx.trucking.simulator.services
 
-import akka.actor.ActorSystem
 import better.files.{File, Scannable}
 import com.hortonworks.orendainx.trucking.simulator.models.{Location, Route}
-import akka.event.Logging
 
 import scala.collection.mutable.ListBuffer
 

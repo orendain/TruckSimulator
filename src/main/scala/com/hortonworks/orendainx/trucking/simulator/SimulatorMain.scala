@@ -2,7 +2,7 @@ package com.hortonworks.orendainx.trucking.simulator
 
 import akka.actor.ActorSystem
 import com.hortonworks.orendainx.trucking.simulator.actors.{DriverCoordinator, TruckAndRouteDepot}
-import com.hortonworks.orendainx.trucking.simulator.collectors.FileCollector
+import com.hortonworks.orendainx.trucking.simulator.collectors.{FileCollector, StandardOutCollector}
 import com.hortonworks.orendainx.trucking.simulator.models.{Driver, DrivingPattern}
 import com.typesafe.config.ConfigFactory
 
@@ -23,12 +23,18 @@ object SimulatorMain {
     implicit val config = ConfigFactory.load()
 
     // Determine the correct collector to initialize
-    val collectorClass = config.getString("options.collector") // TODO: resolve collector based on string
-    val collectorFilepath = config.getString("options.filecollector.filepath")
+    val collectorClass = config.getString("options.collector")
+    val collectorProps = collectorClass match {
+      case "FileCollector" =>
+        val filepath = config.getString("options.filecollector.filepath")
+        FileCollector.props(filepath)
+      case "StandardOutCollector" =>
+        StandardOutCollector.props()
+    }
 
     // Materialize dispatcher and collector actors
     val dispatcher = system.actorOf(TruckAndRouteDepot.props())
-    val eventCollector = system.actorOf(FileCollector.props(collectorFilepath))
+    val eventCollector = system.actorOf(collectorProps)
 
     // Generate driving patterns
     val patterns = config.getConfigList("simulator.driving-patterns").map { conf =>
@@ -39,7 +45,7 @@ object SimulatorMain {
     // Generate drivers
     val driverCount = config.getInt("options.driver-count")
     val drivers = {
-      // TODO: this assumes that special-drivers have sequential ids starting at 1
+      // This assumes that special-drivers have sequential ids starting at 1
 
       // First, initialize all special drivers
       val specialDrivers = config.getConfigList("simulator.special-drivers").map { conf =>

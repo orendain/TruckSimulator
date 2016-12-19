@@ -1,7 +1,6 @@
 package com.hortonworks.orendainx.trucking.simulator.collectors
 
 import akka.actor.{ActorLogging, Props}
-import akka.event.LoggingAdapter
 import better.files.File
 import com.hortonworks.orendainx.trucking.simulator.collectors.EventCollector.CollectEvent
 

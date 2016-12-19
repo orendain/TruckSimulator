@@ -9,7 +9,7 @@ import com.hortonworks.orendainx.trucking.simulator.collectors.EventCollector.Co
   * @author Edgar Orendain <edgar@orendainx.com>
   */
 object StandardOutCollector {
-  def props = Props(new StandardOutCollector)
+  def props() = Props(new StandardOutCollector)
 }
 
 class StandardOutCollector extends EventCollector {
