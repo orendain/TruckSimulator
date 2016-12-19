@@ -15,9 +15,8 @@ import scala.collection.mutable.ListBuffer
   */
 object RouteParser {
 
-  // TODO: fix, obviously :p
-  def apply(directoryPath: String) = {
-    val path = s"/Users/eorendain/Documents/trucking/trucking-simulator/src/main/resources/routes/$directoryPath"
+  def apply(routeDirectory: String) = {
+    val path = s"${getClass.getResource("/routes").getPath}/$routeDirectory"
     new RouteParser(path)
   }
 

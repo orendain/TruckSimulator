@@ -28,9 +28,8 @@ class TruckAndRouteDepot(implicit config: Config) extends Actor with ActorLoggin
   private val trucksAvailable = Random.shuffle(1 to config.getInt("simulator.trucks-available")).map(Truck).toBuffer
   private val routesAvailable = RouteParser(config.getString("options.route-directory")).routes.toBuffer
 
-  log.debug("Routes and trucks ready.")
+  log.info("Trucks and routes initialized and ready for deployment.")
 
-  // TODO: should not return something that was just sent back, to the same driver
   def receive = {
     case RequestTruck(previous) =>
       if (previous.isEmpty) {

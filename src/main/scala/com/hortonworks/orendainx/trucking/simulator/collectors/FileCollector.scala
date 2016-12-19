@@ -20,14 +20,12 @@ class FileCollector(filepath: String) extends EventCollector with ActorLogging {
 
   def receive = {
     case CollectEvent(event) =>
-      log.debug("Received event to collect.")
       writer.write(event.toText)
       writer.newLine()
-    case _ =>
   }
 
   override def postStop(): Unit = {
     writer.close()
-    log.debug("Closed file stream")
+    log.info("FileCollector closed output file stream.")
   }
 }

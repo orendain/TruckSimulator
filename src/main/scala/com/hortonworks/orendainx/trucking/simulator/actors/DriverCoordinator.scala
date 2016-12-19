@@ -1,6 +1,5 @@
 package com.hortonworks.orendainx.trucking.simulator.actors
 
-
 import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props}
 import com.hortonworks.orendainx.trucking.simulator.models.Driver
 import com.typesafe.config.Config
@@ -47,14 +46,13 @@ class DriverCoordinator(drivers: Seq[Driver], depot: ActorRef, eventCollector: A
         driveCounters.update(driverRef, driveCounters(driverRef)+1)
         context.system.scheduler.scheduleOnce((eventDelay + Random.nextInt(eventDelayJitter)).milliseconds, self, TickDriver(driverRef))
       } else {
-        // If a driver has finished their route, see if all drivers have.  If so, terminate the simulation.
+        // If a driver has finished their route, and all other drivers have, terminate the simulation.
         if (!driveCounters.values.exists(_ < eventCount)) context.system.terminate()
       }
-    case _ => log.info("Received an unexpected message.")
   }
 
   override def postStop() = {
-    log.debug("stopping!")
+    log.info("DriverCoordinator stopped.")
   }
 
 }
