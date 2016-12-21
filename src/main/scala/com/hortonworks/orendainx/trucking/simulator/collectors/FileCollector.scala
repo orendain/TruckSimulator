@@ -15,12 +15,11 @@ object FileCollector {
 
 class FileCollector(filepath: String) extends EventCollector with ActorLogging {
 
-  private val writer = File(filepath).createIfNotExists(createParents = true).newBufferedWriter
+  private val writer = File(filepath).createIfNotExists(createParents = true).newPrintWriter(true)
 
   def receive = {
     case CollectEvent(event) =>
-      writer.write(event.toText)
-      writer.newLine()
+      writer.println(event.toText)
   }
 
   override def postStop(): Unit = {
