@@ -30,7 +30,7 @@ class DriverCoordinator(drivers: Seq[Driver], depot: ActorRef, eventCollector: A
   val eventDelayJitter = config.getInt("simulator.event-delay-jitter")
 
   // Create new drivers and initialize a counter for each
-  val driverRefs = drivers.map { driver => context.actorOf(DriverActor.props(driver, depot, eventCollector)) }
+  val driverRefs = drivers.map { driver => context.actorOf(DrivingAgent.props(driver, depot, eventCollector)) }
   val driveCounters = mutable.Map(driverRefs.map((_, 0)): _*)
 
   // Insert each new driver into the simulation (at a random schedule point) and begin "ticking"
@@ -41,7 +41,7 @@ class DriverCoordinator(drivers: Seq[Driver], depot: ActorRef, eventCollector: A
   def receive = {
     case TickDriver(driverRef) =>
       if (driveCounters(driverRef) < eventCount) {
-        driverRef ! DriverActor.Drive
+        driverRef ! DrivingAgent.Drive
         driveCounters.update(driverRef, driveCounters(driverRef)+1)
         context.system.scheduler.scheduleOnce((eventDelay + Random.nextInt(eventDelayJitter)).milliseconds, self, TickDriver(driverRef))
       } else {

@@ -6,7 +6,7 @@ import java.util.Date
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import com.hortonworks.orendainx.trucking.shared.models.{TruckingEvent, TruckingEventTypes}
 import com.hortonworks.orendainx.trucking.simulator.collectors.EventCollector.CollectEvent
-import com.hortonworks.orendainx.trucking.simulator.models.{Driver, Location, Route, Truck}
+import com.hortonworks.orendainx.trucking.simulator.models.{NoTruck, _}
 import com.typesafe.config.Config
 
 import scala.collection.mutable
@@ -15,33 +15,32 @@ import scala.util.Random
 /**
   * @author Edgar Orendain <edgar@orendainx.com>
   */
-object DriverActor {
+object DrivingAgent {
   case object Drive
 
   case class NewRoute(route: Route)
   case class NewTruck(truck: Truck)
 
   def props(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(implicit config: Config) =
-    Props(new DriverActor(driver, depot, eventCollector))
+    Props(new DrivingAgent(driver, depot, eventCollector))
 }
 
-class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(implicit config: Config) extends Actor with ActorLogging {
+class DrivingAgent(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(implicit config: Config) extends Actor with ActorLogging {
 
-  import DriverActor._
+  import DrivingAgent._
+
+  val SpeedingThreshold = config.getInt("simulator.speeding-threshold")
+  val MaxRouteCompletedCount = config.getInt("simulator.max-route-completed-count")
 
   // Current and previous truck/routes
-  var truck: Option[Truck] = None
-  var route: Option[Route] = None
-  var previousTruck: Option[Truck] = None
-  var previousRoute: Option[Route] = None
+  var truck: Truck = NoTruck
+  var route: Route = NoRoute
+  var previousTruck: Truck = NoTruck
+  var previousRoute: Route = NoRoute
 
   // Locations this driver visits
   var locations = List.empty[Location]
   var locationsLeft = mutable.Buffer.empty[Location]
-
-  // TODO: config only being used for 2 options, and they're shared among all users. Consider factoring out.
-  val SpeedingThreshold = config.getInt("simulator.speeding-threshold")
-  val MaxRouteCompletedCount = config.getInt("simulator.max-route-completed-count")
 
   var driveCount = 0
   var routeCompletedCount = 0
@@ -72,22 +71,22 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
 
       // Create event and emit it
       val eventTime = new Timestamp(new Date().getTime)
-      val event = TruckingEvent(eventTime, truck.get.id, driver.id, driver.name, route.get.id, route.get.name, currentLoc.latitude, currentLoc.longitude, speed, eventType)
+      val event = TruckingEvent(eventTime, truck.id, driver.id, driver.name, route.id, route.name, currentLoc.latitude, currentLoc.longitude, speed, eventType)
       eventCollector ! CollectEvent(event)
 
       // If driver completed the route, switch trucks
       if (locationsLeft.isEmpty) {
         previousTruck = truck
-        truck = None
-        depot ! TruckAndRouteDepot.ReturnTruck(previousTruck.get)
+        truck = NoTruck
+        depot ! TruckAndRouteDepot.ReturnTruck(previousTruck)
         depot ! TruckAndRouteDepot.RequestTruck(previousTruck)
 
         // If route traveled too many times, switch routes
         routeCompletedCount += 1
         if (routeCompletedCount > MaxRouteCompletedCount) {
           previousRoute = route
-          route = None
-          depot ! TruckAndRouteDepot.ReturnRoute(previousRoute.get)
+          route = NoRoute
+          depot ! TruckAndRouteDepot.ReturnRoute(previousRoute)
           depot ! TruckAndRouteDepot.RequestRoute(previousRoute)
         } else {
           locations = locations.reverse
@@ -101,21 +100,20 @@ class DriverActor(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(imp
 
   def waitingOndepot: Receive = {
     case NewTruck(newTruck) =>
-      truck = Some(newTruck)
+      truck = newTruck
       inspectState()
       log.info(s"Received new truck with id ${newTruck.id}")
     case NewRoute(newRoute) =>
-      if (route.nonEmpty) depot ! TruckAndRouteDepot.ReturnRoute(route.get)
-      route = Some(newRoute)
-      locations = route.get.locations
+      if (route == NoRoute) depot ! TruckAndRouteDepot.ReturnRoute(previousRoute)
+      route = newRoute
+      locations = route.locations
       locationsLeft = locations.toBuffer
       inspectState()
       log.info(s"Received new route: ${newRoute.name}")
     case Drive =>
-      // TODO: should not requeue because then all same timestamp, but need to make sure all events are generated for driver
-      // TODO: implement exactly-n-times in coordinator.
+      // TODO: should not requeue because then all same timestamp, but need to make sure all events are generated for driver ... implement exactly-n-times in coordinator.
       log.debug("Received Drive command while waiting on resources. Ignoring command, lost generated event.")
   }
 
-  def inspectState(): Unit = if (truck.nonEmpty && route.nonEmpty) context become driverActive
+  def inspectState(): Unit = if (truck != NoTruck && route != NoRoute) context become driverActive
 }

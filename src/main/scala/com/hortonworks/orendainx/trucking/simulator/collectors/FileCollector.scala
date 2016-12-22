@@ -19,7 +19,7 @@ class FileCollector(filepath: String) extends EventCollector with ActorLogging {
 
   def receive = {
     case CollectEvent(event) =>
-      writer.println(event.toText)
+      writer.println(event.toCSV)
   }
 
   override def postStop(): Unit = {
