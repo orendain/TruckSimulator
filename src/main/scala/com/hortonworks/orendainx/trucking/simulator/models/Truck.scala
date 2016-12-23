@@ -5,4 +5,4 @@ package com.hortonworks.orendainx.trucking.simulator.models
   */
 case class Truck(id: Int)
 
-object NoTruck extends Truck(0)
+object EmptyTruck extends Truck(0)

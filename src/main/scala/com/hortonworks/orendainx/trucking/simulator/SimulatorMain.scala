@@ -2,7 +2,7 @@ package com.hortonworks.orendainx.trucking.simulator
 
 import akka.actor.ActorSystem
 import com.hortonworks.orendainx.trucking.simulator.actors.{DriverCoordinator, TruckAndRouteDepot}
-import com.hortonworks.orendainx.trucking.simulator.collectors.{FileCollector, StandardOutCollector}
+import com.hortonworks.orendainx.trucking.simulator.transmitters.{FileTransmitter, StandardOutTransmitter}
 import com.hortonworks.orendainx.trucking.simulator.models.{Driver, DrivingPattern}
 import com.typesafe.config.ConfigFactory
 
@@ -23,19 +23,19 @@ object SimulatorMain {
     val system = ActorSystem("SimulatorMain")
     implicit val config = ConfigFactory.load()
 
-    // Determine the correct collector to initialize
-    val collectorClass = config.getString("options.collector")
-    val collectorProps = collectorClass match {
-      case "FileCollector" =>
-        val filepath = config.getString("options.filecollector.filepath")
-        FileCollector.props(filepath)
-      case "StandardOutCollector" =>
-        StandardOutCollector.props()
+    // Determine the correct transmitter to initialize
+    val transmitterClass = config.getString("options.transmitter")
+    val transmitterProps = transmitterClass match {
+      case "FileTransmitter" =>
+        val filepath = config.getString("options.filetransmitter.filepath")
+        FileTransmitter.props(filepath)
+      case "StandardOutTransmitter" =>
+        StandardOutTransmitter.props()
     }
 
-    // Materialize dispatcher and collector actors
+    // Materialize dispatcher and transmitter actors
     val dispatcher = system.actorOf(TruckAndRouteDepot.props())
-    val eventCollector = system.actorOf(collectorProps)
+    val eventTransmitter = system.actorOf(transmitterProps)
 
     // Generate driving patterns
     val patterns = config.getConfigList("simulator.driving-patterns").map { conf =>
@@ -55,8 +55,8 @@ object SimulatorMain {
 
       // If we need more drivers, generate "normal" drivers. Or if we need to remove some special drivers, do so.
       if (specialDrivers.length < driverCount) {
-        val newDrivers = (specialDrivers.length to driverCount).map { newId =>
-          val randomDriverName = Random.nextString(config.getInt("simulator.driver-name-length"))
+        val newDrivers = ((specialDrivers.length+1) to driverCount).map { newId =>
+          val randomDriverName = Random.alphanumeric.take(config.getInt("simulator.driver-name-length")).mkString
           Driver(newId, randomDriverName, patterns("normal"))
         }
         specialDrivers ++ newDrivers
@@ -65,7 +65,7 @@ object SimulatorMain {
     }
 
     // Create a DriverCoordinator, beginning the simulation
-    system.actorOf(DriverCoordinator.props(drivers, dispatcher, eventCollector))
+    system.actorOf(DriverCoordinator.props(drivers, dispatcher, eventTransmitter))
 
     // Ensure that the actor system is properly terminated when the simulator is shutdown.
     scala.sys.addShutdownHook {

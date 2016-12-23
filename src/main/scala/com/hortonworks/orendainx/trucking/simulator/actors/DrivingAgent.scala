@@ -3,10 +3,10 @@ package com.hortonworks.orendainx.trucking.simulator.actors
 import java.sql.Timestamp
 import java.util.Date
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props, Stash}
 import com.hortonworks.orendainx.trucking.shared.models.{TruckingEvent, TruckingEventTypes}
-import com.hortonworks.orendainx.trucking.simulator.collectors.EventCollector.CollectEvent
-import com.hortonworks.orendainx.trucking.simulator.models.{NoTruck, _}
+import com.hortonworks.orendainx.trucking.simulator.transmitters.EventTransmitter.TransmitEvent
+import com.hortonworks.orendainx.trucking.simulator.models._
 import com.typesafe.config.Config
 
 import scala.collection.mutable
@@ -17,38 +17,35 @@ import scala.util.Random
   */
 object DrivingAgent {
   case object Drive
+  case object EndTrip
+  case object StartTrip
 
   case class NewRoute(route: Route)
   case class NewTruck(truck: Truck)
 
-  def props(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(implicit config: Config) =
-    Props(new DrivingAgent(driver, depot, eventCollector))
+  def props(driver: Driver, depot: ActorRef, eventTransmitter: ActorRef)(implicit config: Config) =
+    Props(new DrivingAgent(driver, depot, eventTransmitter))
 }
 
-class DrivingAgent(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(implicit config: Config) extends Actor with ActorLogging {
+class DrivingAgent(driver: Driver, depot: ActorRef, eventTransmitter: ActorRef)(implicit config: Config) extends Actor with Stash with ActorLogging {
 
   import DrivingAgent._
 
   val SpeedingThreshold = config.getInt("simulator.speeding-threshold")
   val MaxRouteCompletedCount = config.getInt("simulator.max-route-completed-count")
 
-  // Current and previous truck/routes
-  var truck: Truck = NoTruck
-  var route: Route = NoRoute
-  var previousTruck: Truck = NoTruck
-  var previousRoute: Route = NoRoute
-
-  // Locations this driver visits
+  // Truck and route being used, and locations this driving agent has driven to
+  var truck: Truck = EmptyTruck
+  var route: Route = EmptyRoute
   var locations = List.empty[Location]
-  var locationsLeft = mutable.Buffer.empty[Location]
+  var locationsRemaining = locations.iterator
 
   var driveCount = 0
   var routeCompletedCount = 0
 
-  depot ! TruckAndRouteDepot.RequestRoute(previousRoute)
-  depot ! TruckAndRouteDepot.RequestTruck(previousTruck)
-
-  context become waitingOndepot
+  depot ! TruckAndRouteDepot.RequestRoute(route)
+  depot ! TruckAndRouteDepot.RequestTruck(truck)
+  context become waitingOnDepot
 
   def receive = {
     case _ => log.error("This message should never be seen.")
@@ -57,9 +54,9 @@ class DrivingAgent(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(im
   def driverActive: Receive = {
     case Drive =>
       driveCount += 1
-      log.info(s"Processing drive event #$driveCount")
+      log.debug(s"Driver #${driver.id} processing event #$driveCount")
 
-      val currentLoc = locationsLeft.remove(0)
+      val currentLoc = locationsRemaining.next()
       val speed =
         driver.drivingPattern.minSpeed + Random.nextInt(driver.drivingPattern.maxSpeed - driver.drivingPattern.minSpeed + 1)
 
@@ -71,49 +68,62 @@ class DrivingAgent(driver: Driver, depot: ActorRef, eventCollector: ActorRef)(im
 
       // Create event and emit it
       val eventTime = new Timestamp(new Date().getTime)
-      val event = TruckingEvent(eventTime, truck.id, driver.id, driver.name, route.id, route.name, currentLoc.latitude, currentLoc.longitude, speed, eventType)
-      eventCollector ! CollectEvent(event)
+      val event = TruckingEvent(eventTime, truck.id, driver.id, driver.name,
+        route.id, route.name, currentLoc.latitude, currentLoc.longitude, speed, eventType)
+      eventTransmitter ! TransmitEvent(event)
 
       // If driver completed the route, switch trucks
-      if (locationsLeft.isEmpty) {
-        previousTruck = truck
-        truck = NoTruck
-        depot ! TruckAndRouteDepot.ReturnTruck(previousTruck)
-        depot ! TruckAndRouteDepot.RequestTruck(previousTruck)
+      if (locationsRemaining.isEmpty) {
+        depot ! TruckAndRouteDepot.ReturnTruck(truck)
+        depot ! TruckAndRouteDepot.RequestTruck(truck)
+        truck = EmptyTruck
 
         // If route traveled too many times, switch routes
         routeCompletedCount += 1
         if (routeCompletedCount > MaxRouteCompletedCount) {
-          previousRoute = route
-          route = NoRoute
-          depot ! TruckAndRouteDepot.ReturnRoute(previousRoute)
-          depot ! TruckAndRouteDepot.RequestRoute(previousRoute)
+          depot ! TruckAndRouteDepot.ReturnRoute(route)
+          depot ! TruckAndRouteDepot.RequestRoute(route)
+          route = EmptyRoute
         } else {
           locations = locations.reverse
-          locationsLeft = locations.toBuffer
+          locationsRemaining = locations.iterator
         }
 
-        log.info("Changing context to waitingOnDepot")
-        context become waitingOndepot
+        log.debug("Changing context to waitingOnDepot")
+        context become waitingOnDepot
       }
+
+      // Tell the driverCoordinator we're ready for another tick
+      sender() ! DriverCoordinator.TickDriver(self)
   }
 
-  def waitingOndepot: Receive = {
+  def waitingOnDepot: Receive = {
     case NewTruck(newTruck) =>
       truck = newTruck
-      inspectState()
-      log.info(s"Received new truck with id ${newTruck.id}")
+      considerBecome()
+      log.info(s"Driver (${driver.id}, ${driver.name}) received new truck with id ${newTruck.id}")
     case NewRoute(newRoute) =>
-      if (route == NoRoute) depot ! TruckAndRouteDepot.ReturnRoute(previousRoute)
       route = newRoute
       locations = route.locations
-      locationsLeft = locations.toBuffer
-      inspectState()
-      log.info(s"Received new route: ${newRoute.name}")
+      locationsRemaining = locations.iterator
+      routeCompletedCount = 0
+      considerBecome()
+      log.info(s"Driver (${driver.id}, ${driver.name}) received new route: ${newRoute.name}")
     case Drive =>
-      // TODO: should not requeue because then all same timestamp, but need to make sure all events are generated for driver ... implement exactly-n-times in coordinator.
-      log.debug("Received Drive command while waiting on resources. Ignoring command, lost generated event.")
+      stash()
+      log.debug("Received Drive command while waiting on resources. Command stashed for later processing.")
   }
 
-  def inspectState(): Unit = if (truck != NoTruck && route != NoRoute) context become driverActive
+  def considerBecome(): Unit = {
+    if (truck != EmptyTruck && route != EmptyRoute) {
+      unstashAll()
+      context become driverActive
+    }
+  }
+
+  // When this actor is stopped, release resources it may still be holding onto
+  override def postStop(): Unit = {
+    if (truck != EmptyTruck) depot ! TruckAndRouteDepot.ReturnTruck(truck)
+    if (route != EmptyRoute) depot ! TruckAndRouteDepot.ReturnRoute(route)
+  }
 }
