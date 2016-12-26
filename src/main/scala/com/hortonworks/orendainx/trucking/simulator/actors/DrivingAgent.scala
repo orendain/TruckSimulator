@@ -5,6 +5,7 @@ import java.util.Date
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Stash}
 import com.hortonworks.orendainx.trucking.shared.models.{TruckingEvent, TruckingEventTypes}
+import com.hortonworks.orendainx.trucking.simulator.coordinators.DriverCoordinator
 import com.hortonworks.orendainx.trucking.simulator.models._
 import com.hortonworks.orendainx.trucking.simulator.transmitters.EventTransmitter.TransmitEvent
 import com.typesafe.config.Config
@@ -92,8 +93,8 @@ class DrivingAgent(driver: Driver, depot: ActorRef, eventTransmitter: ActorRef)(
         context become waitingOnDepot
       }
 
-      // Tell the driverCoordinator we're ready for another tick
-      sender() ! DriverCoordinator.TickDriver(self)
+      // Tell the coordinator we've acknowledged the drive command
+      sender() ! DriverCoordinator.AcknowledgeTick(self)
   }
 
   def waitingOnDepot: Receive = {

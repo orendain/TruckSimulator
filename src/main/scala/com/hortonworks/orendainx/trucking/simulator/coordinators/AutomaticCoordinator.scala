@@ -1,6 +1,7 @@
-package com.hortonworks.orendainx.trucking.simulator.actors
+package com.hortonworks.orendainx.trucking.simulator.coordinators
 
-import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props, Terminated}
+import akka.actor.{ActorLogging, ActorRef, PoisonPill, Props, Terminated}
+import com.hortonworks.orendainx.trucking.simulator.actors.DrivingAgent
 import com.hortonworks.orendainx.trucking.simulator.models.Driver
 import com.typesafe.config.Config
 
@@ -11,16 +12,17 @@ import scala.util.Random
 /**
   * @author Edgar Orendain <edgar@orendainx.com>
   */
-object DriverCoordinator {
-  case class TickDriver(drivingAgent: ActorRef)
+object AutomaticCoordinator {
+  case class TickDrivingAgent(drivingAgent: ActorRef)
 
   def props(drivers: Seq[Driver], depot: ActorRef, eventTransmitter: ActorRef)(implicit config: Config) =
-    Props(new DriverCoordinator(drivers, depot, eventTransmitter))
+    Props(new AutomaticCoordinator(drivers, depot, eventTransmitter))
 }
 
-class DriverCoordinator(drivers: Seq[Driver], depot: ActorRef, eventTransmitter: ActorRef)(implicit config: Config) extends Actor with ActorLogging {
+class AutomaticCoordinator(drivers: Seq[Driver], depot: ActorRef, eventTransmitter: ActorRef)(implicit config: Config) extends DriverCoordinator with ActorLogging {
 
   // For receive messages and an execution context
+  import AutomaticCoordinator._
   import DriverCoordinator._
   import context.dispatcher
 
@@ -35,11 +37,14 @@ class DriverCoordinator(drivers: Seq[Driver], depot: ActorRef, eventTransmitter:
 
   // Insert each new driver into the simulation (at a random scheduled point) and begin "ticking"
   drivingAgents.foreach { driverRef =>
-    context.system.scheduler.scheduleOnce(Random.nextInt(eventDelay + eventDelayJitter).milliseconds, self, TickDriver(driverRef))
+    context.system.scheduler.scheduleOnce(Random.nextInt(eventDelay + eventDelayJitter).milliseconds, self, TickDrivingAgent(driverRef))
   }
 
   def receive = {
-    case TickDriver(drivingAgent) =>
+    case AcknowledgeTick(drivingAgent) =>
+      self ! TickDrivingAgent(drivingAgent) // Each ack triggers another tick
+
+    case TickDrivingAgent(drivingAgent) =>
       driveCounters.update(drivingAgent, driveCounters(drivingAgent)+1)
 
       if (driveCounters(drivingAgent) <= eventCount) {
