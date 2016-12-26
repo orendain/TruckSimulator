@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import com.hortonworks.orendainx.trucking.simulator.actors.TruckAndRouteDepot
 import com.hortonworks.orendainx.trucking.simulator.coordinators.AutomaticCoordinator
 import com.hortonworks.orendainx.trucking.simulator.models.{Driver, DrivingPattern}
-import com.hortonworks.orendainx.trucking.simulator.transmitters.{FileTransmitter, StandardOutTransmitter}
+import com.hortonworks.orendainx.trucking.simulator.transmitters.{AccumulateTransmitter, FileTransmitter, StandardOutTransmitter}
 import com.typesafe.config.ConfigFactory
 
 import scala.collection.JavaConversions._
@@ -34,8 +34,8 @@ object SimulatorMain {
         StandardOutTransmitter.props()
     }
 
-    // Materialize dispatcher and transmitter actors
-    val dispatcher = system.actorOf(TruckAndRouteDepot.props())
+    // Materialize depot and transmitter actors
+    val depot = system.actorOf(TruckAndRouteDepot.props())
     val eventTransmitter = system.actorOf(transmitterProps)
 
     // Generate driving patterns
@@ -66,7 +66,7 @@ object SimulatorMain {
     }
 
     // Create a DriverCoordinator, beginning the simulation
-    system.actorOf(AutomaticCoordinator.props(drivers, dispatcher, eventTransmitter))
+    system.actorOf(AutomaticCoordinator.props(drivers, depot, eventTransmitter))
 
     // Ensure that the actor system is properly terminated when the simulator is shutdown.
     scala.sys.addShutdownHook {
