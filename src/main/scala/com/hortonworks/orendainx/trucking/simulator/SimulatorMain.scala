@@ -2,8 +2,8 @@ package com.hortonworks.orendainx.trucking.simulator
 
 import akka.actor.ActorSystem
 import com.hortonworks.orendainx.trucking.simulator.actors.{DriverCoordinator, TruckAndRouteDepot}
-import com.hortonworks.orendainx.trucking.simulator.transmitters.{FileTransmitter, StandardOutTransmitter}
 import com.hortonworks.orendainx.trucking.simulator.models.{Driver, DrivingPattern}
+import com.hortonworks.orendainx.trucking.simulator.transmitters.{FileTransmitter, StandardOutTransmitter}
 import com.typesafe.config.ConfigFactory
 
 import scala.collection.JavaConversions._

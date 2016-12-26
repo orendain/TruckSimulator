@@ -5,11 +5,10 @@ import java.util.Date
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Stash}
 import com.hortonworks.orendainx.trucking.shared.models.{TruckingEvent, TruckingEventTypes}
-import com.hortonworks.orendainx.trucking.simulator.transmitters.EventTransmitter.TransmitEvent
 import com.hortonworks.orendainx.trucking.simulator.models._
+import com.hortonworks.orendainx.trucking.simulator.transmitters.EventTransmitter.TransmitEvent
 import com.typesafe.config.Config
 
-import scala.collection.mutable
 import scala.util.Random
 
 /**

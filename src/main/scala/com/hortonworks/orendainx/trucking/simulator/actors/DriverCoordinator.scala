@@ -5,7 +5,6 @@ import com.hortonworks.orendainx.trucking.simulator.models.Driver
 import com.typesafe.config.Config
 
 import scala.collection.mutable
-import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Random
 
