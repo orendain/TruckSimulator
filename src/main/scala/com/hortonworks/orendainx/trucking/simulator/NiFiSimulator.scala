@@ -21,8 +21,8 @@ object NiFiSimulator {
 
 class NiFiSimulator {
 
-  private val system = ActorSystem("NiFiSimulator")
   private implicit val config = ConfigFactory.load()
+  val system = ActorSystem("NiFiSimulator")
 
   // Create the depot and generate the drivers in the simulation
   private val depot = system.actorOf(TruckAndRouteDepot.props())
@@ -36,6 +36,10 @@ class NiFiSimulator {
   scala.sys.addShutdownHook {
     system.terminate()
     Await.result(system.whenTerminated, 15.seconds)
+  }
+
+  def stop(): Unit = {
+    system.terminate()
   }
 
   /**

@@ -19,7 +19,7 @@ import scala.util.Random
   */
 object SimulatorMain {
 
-  def main(args: Array[String]): Unit = {
+  def main2(args: Array[String]): Unit = {
 
     val system = ActorSystem("SimulatorMain")
     implicit val config = ConfigFactory.load()

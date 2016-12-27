@@ -29,6 +29,8 @@ class TruckAndRouteDepot(implicit config: Config) extends Actor with Stash with 
   private val routesAvailable = RouteParser(config.getString("options.route-directory")).routes.toBuffer
 
   log.info("Trucks and routes initialized and ready for deployment")
+  log.info(s"${trucksAvailable.length} trucks available.")
+  log.info(s"${routesAvailable.length} routes available.")
 
   def receive = {
     case RequestTruck(previous) if previous != EmptyTruck =>

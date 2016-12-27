@@ -30,6 +30,7 @@ class ManualCoordinator(drivers: Seq[Driver], depot: ActorRef, eventTransmitter:
   def receive = {
     case AcknowledgeTick(drivingAgent) =>
       drivingAgentsReady += drivingAgent
+      log.debug(s"Someone acknowledged tick - total: ${drivingAgentsReady.size}")
 
     case Tick =>
       drivingAgentsReady.foreach { drivingAgent =>

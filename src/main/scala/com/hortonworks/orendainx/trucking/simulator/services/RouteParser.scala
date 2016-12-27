@@ -1,7 +1,13 @@
 package com.hortonworks.orendainx.trucking.simulator.services
 
+import java.net.URI
+import java.nio.file.{FileSystem, FileSystemNotFoundException, FileSystems}
+import java.util
+
 import better.files.{File, Scannable}
+import better.files._
 import com.hortonworks.orendainx.trucking.simulator.models.{Location, Route}
+import com.typesafe.scalalogging.Logger
 
 import scala.collection.mutable.ListBuffer
 
@@ -13,9 +19,47 @@ import scala.collection.mutable.ListBuffer
   */
 object RouteParser {
 
-  def apply(routeDirectory: String) = {
+  val log = Logger(getClass)
+
+  def apply(routeDirectory: String): RouteParser = {
+    //val path = s"${getClass.getResource("/routes").getPath}/$routeDirectory"
+
+    //val path = s"${getClass.getResource(".").getPath}"
+    //log.debug(s"path: $path")
+    //new RouteParser(path)
+
     val path = s"${getClass.getResource("/routes").getPath}/$routeDirectory"
-    new RouteParser(path)
+    log.debug(s"1 $path")
+    if (path.startsWith("file")) { // is a jar file
+      val p = path.takeWhile(_ != '!')
+      log.debug(s"2 $p")
+      val jarPath = URI.create(s"jar:$p")
+      log.debug(s"3 $jarPath")
+      //val env = Map[String, String]("create" -> "true")
+      val env = new util.HashMap[String, String]()
+      //env.put("create", "true")
+
+
+      val fs = try {
+        FileSystems.getFileSystem(jarPath)
+      } catch {
+        case ex: FileSystemNotFoundException =>
+          FileSystems.newFileSystem(jarPath, env)
+      }
+
+        //val fs = FileSystems.newFileSystem(jarPath, env)
+
+        val fsp = fs.getPath("/routes/midwest")
+        log.debug(s"4 ${fsp.toString}")
+
+        //val file = fsp.toFile.toScala
+        val file = File(fsp)
+        new RouteParser(file)
+    } else {
+      log.debug(s"path: $path")
+      new RouteParser(File(path))
+    }
+
   }
 
   def parseFile(file: File): Route = {
@@ -35,10 +79,23 @@ object RouteParser {
   }
 }
 
-class RouteParser(directoryPath: String) {
+/*class RouteParser(directoryPath: String) {
 
   lazy val routes: List[Route] = {
     val directory = File(directoryPath)
+
+    if (directory.isDirectory)
+      directory.listRecursively
+        .filter(_.extension.contains(".route"))
+        .map(RouteParser.parseFile).toList
+    else
+      List.empty[Route]
+  }
+}*/
+
+class RouteParser(directory: File) {
+
+  lazy val routes: List[Route] = {
 
     if (directory.isDirectory)
       directory.listRecursively

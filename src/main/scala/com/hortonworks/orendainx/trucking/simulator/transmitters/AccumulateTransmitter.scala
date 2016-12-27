@@ -23,10 +23,13 @@ class AccumulateTransmitter extends EventTransmitter with ActorLogging {
   val buffer = mutable.ListBuffer.empty[Event]
 
   def receive = {
-    case TransmitEvent(event) => buffer += event
+    case TransmitEvent(event) =>
+      buffer += event
+      log.debug(s"Event received: buffered ${buffer.size}")
 
     case Fetch =>
       sender() ! buffer.toList
+      log.debug(s"Sent ${buffer.size} events. ${buffer.toString()}")
       buffer.clear()
   }
 
