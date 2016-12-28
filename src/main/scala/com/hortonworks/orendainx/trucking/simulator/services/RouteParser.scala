@@ -1,11 +1,10 @@
 package com.hortonworks.orendainx.trucking.simulator.services
 
 import java.net.URI
-import java.nio.file.{FileSystem, FileSystemNotFoundException, FileSystems}
+import java.nio.file.{FileSystemNotFoundException, FileSystems}
 import java.util
 
 import better.files.{File, Scannable}
-import better.files._
 import com.hortonworks.orendainx.trucking.simulator.models.{Location, Route}
 import com.typesafe.scalalogging.Logger
 
@@ -28,6 +27,7 @@ object RouteParser {
     //log.debug(s"path: $path")
     //new RouteParser(path)
 
+    // TODO: Cleanup
     val path = s"${getClass.getResource("/routes").getPath}/$routeDirectory"
     log.debug(s"1 $path")
     if (path.startsWith("file")) { // is a jar file
@@ -78,20 +78,6 @@ object RouteParser {
     Location(scanner.next[String], scanner.next[String])
   }
 }
-
-/*class RouteParser(directoryPath: String) {
-
-  lazy val routes: List[Route] = {
-    val directory = File(directoryPath)
-
-    if (directory.isDirectory)
-      directory.listRecursively
-        .filter(_.extension.contains(".route"))
-        .map(RouteParser.parseFile).toList
-    else
-      List.empty[Route]
-  }
-}*/
 
 class RouteParser(directory: File) {
 

@@ -1,10 +1,9 @@
 package com.hortonworks.orendainx.trucking.simulator
 
 import akka.actor.ActorSystem
-import com.hortonworks.orendainx.trucking.simulator.actors.TruckAndRouteDepot
 import com.hortonworks.orendainx.trucking.simulator.coordinators.AutomaticCoordinator
 import com.hortonworks.orendainx.trucking.simulator.models.{Driver, DrivingPattern}
-import com.hortonworks.orendainx.trucking.simulator.transmitters.{AccumulateTransmitter, FileTransmitter, StandardOutTransmitter}
+import com.hortonworks.orendainx.trucking.simulator.transmitters.{FileTransmitter, StandardOutTransmitter}
 import com.typesafe.config.ConfigFactory
 
 import scala.collection.JavaConversions._
@@ -17,6 +16,7 @@ import scala.util.Random
   *
   * @author Edgar Orendain <edgar@orendainx.com>
   */
+/*
 object SimulatorMain {
 
   def main2(args: Array[String]): Unit = {
@@ -35,7 +35,7 @@ object SimulatorMain {
     }
 
     // Materialize depot and transmitter actors
-    val depot = system.actorOf(TruckAndRouteDepot.props())
+    val depot = system.actorOf(NoSharingDepot.props())
     val eventTransmitter = system.actorOf(transmitterProps)
 
     // Generate driving patterns
@@ -75,3 +75,4 @@ object SimulatorMain {
     }
   }
 }
+*/

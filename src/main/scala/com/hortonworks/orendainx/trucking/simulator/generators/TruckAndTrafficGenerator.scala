@@ -1,13 +1,15 @@
-package com.hortonworks.orendainx.trucking.simulator.actors
+package com.hortonworks.orendainx.trucking.simulator.generators
 
 import java.sql.Timestamp
 import java.util.Date
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props, Stash}
-import com.hortonworks.orendainx.trucking.shared.models.{TruckingEvent, TruckingEventTypes}
+import akka.actor.{ActorLogging, ActorRef, Props, Stash}
+import com.hortonworks.orendainx.trucking.shared.models.{TrafficData, TruckEvent, TruckEventTypes}
 import com.hortonworks.orendainx.trucking.simulator.coordinators.DriverCoordinator
+import com.hortonworks.orendainx.trucking.simulator.depots.ResourceDepot.{RequestRoute, RequestTruck, ReturnRoute, ReturnTruck}
+import com.hortonworks.orendainx.trucking.simulator.generators.DataGenerator.{GenerateData, NewResource}
 import com.hortonworks.orendainx.trucking.simulator.models._
-import com.hortonworks.orendainx.trucking.simulator.transmitters.EventTransmitter.TransmitEvent
+import com.hortonworks.orendainx.trucking.simulator.transmitters.DataTransmitter.Transmit
 import com.typesafe.config.Config
 
 import scala.util.Random
@@ -15,21 +17,13 @@ import scala.util.Random
 /**
   * @author Edgar Orendain <edgar@orendainx.com>
   */
-object DrivingAgent {
-  case object Drive
-  case object EndTrip
-  case object StartTrip
+object TruckAndTrafficGenerator {
 
-  case class NewRoute(route: Route)
-  case class NewTruck(truck: Truck)
-
-  def props(driver: Driver, depot: ActorRef, eventTransmitter: ActorRef)(implicit config: Config) =
-    Props(new DrivingAgent(driver, depot, eventTransmitter))
+  def props(driver: Driver, depot: ActorRef, flowManager: ActorRef)(implicit config: Config) =
+    Props(new TruckAndTrafficGenerator(driver, depot, flowManager))
 }
 
-class DrivingAgent(driver: Driver, depot: ActorRef, eventTransmitter: ActorRef)(implicit config: Config) extends Actor with Stash with ActorLogging {
-
-  import DrivingAgent._
+class TruckAndTrafficGenerator(driver: Driver, depot: ActorRef, flowManager: ActorRef)(implicit config: Config) extends DataGenerator with Stash with ActorLogging {
 
   val SpeedingThreshold = config.getInt("simulator.speeding-threshold")
   val MaxRouteCompletedCount = config.getInt("simulator.max-route-completed-count")
@@ -39,12 +33,13 @@ class DrivingAgent(driver: Driver, depot: ActorRef, eventTransmitter: ActorRef)(
   var route: Route = EmptyRoute
   var locations = List.empty[Location]
   var locationsRemaining = locations.iterator
+  var congestionLevel = 0
 
   var driveCount = 0
   var routeCompletedCount = 0
 
-  depot ! TruckAndRouteDepot.RequestRoute(route)
-  depot ! TruckAndRouteDepot.RequestTruck(truck)
+  depot ! RequestRoute(route)
+  depot ! RequestTruck(truck)
   context become waitingOnDepot
 
   def receive = {
@@ -52,7 +47,7 @@ class DrivingAgent(driver: Driver, depot: ActorRef, eventTransmitter: ActorRef)(
   }
 
   def driverActive: Receive = {
-    case Drive =>
+    case GenerateData =>
       driveCount += 1
       log.debug(s"Driver #${driver.id} processing event #$driveCount")
 
@@ -62,27 +57,32 @@ class DrivingAgent(driver: Driver, depot: ActorRef, eventTransmitter: ActorRef)(
 
       val eventType =
         if (speed >= SpeedingThreshold || driveCount % driver.drivingPattern.riskFrequency == 0)
-          TruckingEventTypes.AllTypes(Random.nextInt(TruckingEventTypes.AllTypes.length))
+          TruckEventTypes.AllTypes(Random.nextInt(TruckEventTypes.AllTypes.length))
         else
-          TruckingEventTypes.Normal
+          TruckEventTypes.Normal
 
-      // Create event and emit it
+      // Create trucking event and emit it
       val eventTime = new Timestamp(new Date().getTime)
-      val event = TruckingEvent(eventTime, truck.id, driver.id, driver.name,
+      val event = TruckEvent(eventTime, truck.id, driver.id, driver.name,
         route.id, route.name, currentLoc.latitude, currentLoc.longitude, speed, eventType)
-      eventTransmitter ! TransmitEvent(event)
+      flowManager ! Transmit(event)
+
+      // Create traffic data and emit it
+      congestionLevel += Random.nextInt(11) - 5 // -5 to 5
+    val traffic = TrafficData(eventTime, route.id, congestionLevel)
+      flowManager ! Transmit(traffic)
 
       // If driver completed the route, switch trucks
       if (locationsRemaining.isEmpty) {
-        depot ! TruckAndRouteDepot.ReturnTruck(truck)
-        depot ! TruckAndRouteDepot.RequestTruck(truck)
+        depot ! ReturnTruck(truck)
+        depot ! RequestTruck(truck)
         truck = EmptyTruck
 
         // If route traveled too many times, switch routes
         routeCompletedCount += 1
         if (routeCompletedCount > MaxRouteCompletedCount) {
-          depot ! TruckAndRouteDepot.ReturnRoute(route)
-          depot ! TruckAndRouteDepot.RequestRoute(route)
+          depot ! ReturnRoute(route)
+          depot ! RequestRoute(route)
           route = EmptyRoute
         } else {
           locations = locations.reverse
@@ -98,20 +98,20 @@ class DrivingAgent(driver: Driver, depot: ActorRef, eventTransmitter: ActorRef)(
   }
 
   def waitingOnDepot: Receive = {
-    case NewTruck(newTruck) =>
+    case NewResource(newTruck: Truck) =>
       truck = newTruck
       considerBecome()
       log.info(s"Driver (${driver.id}, ${driver.name}) received new truck with id ${newTruck.id}")
-    case NewRoute(newRoute) =>
+    case NewResource(newRoute: Route) =>
       route = newRoute
       locations = route.locations
       locationsRemaining = locations.iterator
       routeCompletedCount = 0
       considerBecome()
       log.info(s"Driver (${driver.id}, ${driver.name}) received new route: ${newRoute.name}")
-    case Drive =>
+    case GenerateData =>
       stash()
-      log.debug("Received Drive command while waiting on resources. Command stashed for later processing.")
+      log.debug("Received Tick command while waiting on resources. Command stashed for later processing.")
   }
 
   def considerBecome(): Unit = {
@@ -123,7 +123,7 @@ class DrivingAgent(driver: Driver, depot: ActorRef, eventTransmitter: ActorRef)(
 
   // When this actor is stopped, release resources it may still be holding onto
   override def postStop(): Unit = {
-    if (truck != EmptyTruck) depot ! TruckAndRouteDepot.ReturnTruck(truck)
-    if (route != EmptyRoute) depot ! TruckAndRouteDepot.ReturnRoute(route)
+    if (truck != EmptyTruck) depot ! ReturnTruck(truck)
+    if (route != EmptyRoute) depot ! ReturnRoute(route)
   }
 }

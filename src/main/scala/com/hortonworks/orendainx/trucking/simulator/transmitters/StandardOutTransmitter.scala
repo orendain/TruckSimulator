@@ -1,10 +1,10 @@
 package com.hortonworks.orendainx.trucking.simulator.transmitters
 
 import akka.actor.Props
-import com.hortonworks.orendainx.trucking.simulator.transmitters.EventTransmitter.TransmitEvent
+import com.hortonworks.orendainx.trucking.simulator.transmitters.DataTransmitter.Transmit
 
 /**
-  * StandardOutTransmitter records events to standard output.
+  * StandardOutTransmitter records data to standard output.
   *
   * @author Edgar Orendain <edgar@orendainx.com>
   */
@@ -12,10 +12,10 @@ object StandardOutTransmitter {
   def props() = Props(new StandardOutTransmitter)
 }
 
-class StandardOutTransmitter extends EventTransmitter {
+class StandardOutTransmitter extends DataTransmitter {
 
   def receive = {
-    case TransmitEvent(event) => println(event.toCSV)
+    case Transmit(data) => println(data.toCSV)
   }
 
 }

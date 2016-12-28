@@ -1,6 +1,8 @@
-package com.hortonworks.orendainx.trucking.simulator.actors
+package com.hortonworks.orendainx.trucking.simulator.depots
 
-import akka.actor.{Actor, ActorLogging, Props, Stash}
+import akka.actor.{ActorLogging, Props, Stash}
+import com.hortonworks.orendainx.trucking.simulator.depots.ResourceDepot.{RequestRoute, RequestTruck, ReturnRoute, ReturnTruck}
+import com.hortonworks.orendainx.trucking.simulator.generators.DataGenerator.NewResource
 import com.hortonworks.orendainx.trucking.simulator.models._
 import com.hortonworks.orendainx.trucking.simulator.services.RouteParser
 import com.typesafe.config.Config
@@ -10,20 +12,13 @@ import scala.util.Random
 /**
   * @author Edgar Orendain <edgar@orendainx.com>
   */
-object TruckAndRouteDepot {
-  case class RequestTruck(previous: Truck)
-  case class RequestRoute(previous: Route)
-
-  case class ReturnTruck(truck: Truck)
-  case class ReturnRoute(route: Route)
+object NoSharingDepot {
 
   def props()(implicit config: Config) =
-    Props(new TruckAndRouteDepot())
+    Props(new NoSharingDepot())
 }
 
-class TruckAndRouteDepot(implicit config: Config) extends Actor with Stash with ActorLogging {
-
-  import TruckAndRouteDepot._
+class NoSharingDepot(implicit config: Config) extends ResourceDepot with Stash with ActorLogging {
 
   private val trucksAvailable = Random.shuffle(1 to config.getInt("simulator.trucks-available")).toList.map(Truck).toBuffer
   private val routesAvailable = RouteParser(config.getString("options.route-directory")).routes.toBuffer
@@ -35,20 +30,20 @@ class TruckAndRouteDepot(implicit config: Config) extends Actor with Stash with 
   def receive = {
     case RequestTruck(previous) if previous != EmptyTruck =>
       val ind = trucksAvailable.indexWhere(_ != previous)
-      if (ind >= 0) sender() ! DrivingAgent.NewTruck(trucksAvailable.remove(ind))
+      if (ind >= 0) sender() ! NewResource(trucksAvailable.remove(ind))
       else stash() // None available, stash request for later
 
     case RequestTruck(_) =>
-      if (trucksAvailable.nonEmpty) sender() ! DrivingAgent.NewTruck(trucksAvailable.remove(0))
+      if (trucksAvailable.nonEmpty) sender() ! NewResource(trucksAvailable.remove(0))
       else stash()
 
     case RequestRoute(previous) if previous != EmptyRoute =>
       val ind = routesAvailable.indexWhere(_ != previous)
-      if (ind >= 0) sender() ! DrivingAgent.NewRoute(routesAvailable.remove(ind))
+      if (ind >= 0) sender() ! NewResource(routesAvailable.remove(ind))
       else stash()
 
     case RequestRoute(_) =>
-      if (routesAvailable.nonEmpty) sender() ! DrivingAgent.NewRoute(routesAvailable.remove(0))
+      if (routesAvailable.nonEmpty) sender() ! NewResource(routesAvailable.remove(0))
       else stash()
 
     case ReturnTruck(truck) =>

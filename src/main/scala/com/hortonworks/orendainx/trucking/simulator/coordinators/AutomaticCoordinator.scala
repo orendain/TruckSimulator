@@ -1,8 +1,8 @@
 package com.hortonworks.orendainx.trucking.simulator.coordinators
 
 import akka.actor.{ActorLogging, ActorRef, PoisonPill, Props, Terminated}
-import com.hortonworks.orendainx.trucking.simulator.actors.DrivingAgent
-import com.hortonworks.orendainx.trucking.simulator.models.Driver
+import com.hortonworks.orendainx.trucking.simulator.flows.FlowManager
+import com.hortonworks.orendainx.trucking.simulator.generators.DataGenerator
 import com.typesafe.config.Config
 
 import scala.collection.mutable
@@ -13,13 +13,13 @@ import scala.util.Random
   * @author Edgar Orendain <edgar@orendainx.com>
   */
 object AutomaticCoordinator {
-  case class TickDrivingAgent(drivingAgent: ActorRef)
+  case class TickGenerator(generator: ActorRef)
 
-  def props(drivers: Seq[Driver], depot: ActorRef, eventTransmitter: ActorRef)(implicit config: Config) =
-    Props(new AutomaticCoordinator(drivers, depot, eventTransmitter))
+  def props(drivers: Seq[ActorRef], flowManager: ActorRef)(implicit config: Config) =
+    Props(new AutomaticCoordinator(drivers, flowManager))
 }
 
-class AutomaticCoordinator(drivers: Seq[Driver], depot: ActorRef, eventTransmitter: ActorRef)(implicit config: Config) extends DriverCoordinator with ActorLogging {
+class AutomaticCoordinator(generators: Seq[ActorRef], flowManager: ActorRef)(implicit config: Config) extends DriverCoordinator with ActorLogging {
 
   // For receive messages and an execution context
   import AutomaticCoordinator._
@@ -31,36 +31,36 @@ class AutomaticCoordinator(drivers: Seq[Driver], depot: ActorRef, eventTransmitt
   val eventDelay = config.getInt("simulator.event-delay")
   val eventDelayJitter = config.getInt("simulator.event-delay-jitter")
 
-  // Create new drivers and initialize a drive counter for each
-  val drivingAgents = drivers.map { driver => context.actorOf(DrivingAgent.props(driver, depot, eventTransmitter)) }
-  val driveCounters = mutable.Map(drivingAgents.map((_, 0)): _*)
+  // Initialize a drive counter for each data generator
+  val generateCounters = mutable.Map(generators.map((_, 0)): _*)
 
   // Insert each new driver into the simulation (at a random scheduled point) and begin "ticking"
-  drivingAgents.foreach { driverRef =>
-    context.system.scheduler.scheduleOnce(Random.nextInt(eventDelay + eventDelayJitter).milliseconds, self, TickDrivingAgent(driverRef))
+  generators.foreach { generator =>
+    context.system.scheduler.scheduleOnce(Random.nextInt(eventDelay + eventDelayJitter).milliseconds, self, TickGenerator(generator))
   }
 
+  // TODO: instead of killing flowmanager, tell parent/manager that it is done/stopped?
   def receive = {
-    case AcknowledgeTick(drivingAgent) =>
-      self ! TickDrivingAgent(drivingAgent) // Each ack triggers another tick
+    case AcknowledgeTick(generator) =>
+      self ! TickGenerator(generator) // Each ack triggers another tick
 
-    case TickDrivingAgent(drivingAgent) =>
-      driveCounters.update(drivingAgent, driveCounters(drivingAgent)+1)
+    case TickGenerator(generator) =>
+      generateCounters.update(generator, generateCounters(generator)+1)
 
-      if (driveCounters(drivingAgent) <= eventCount) {
-        context.system.scheduler.scheduleOnce((eventDelay + Random.nextInt(eventDelayJitter)).milliseconds, drivingAgent, DrivingAgent.Drive)
+      if (generateCounters(generator) <= eventCount) {
+        context.system.scheduler.scheduleOnce((eventDelay + Random.nextInt(eventDelayJitter)).milliseconds, generator, DataGenerator.GenerateData)
       } else {
-        // Kill the individual drivingAgent as we are done with it.
-        drivingAgent ! PoisonPill
+        // Kill the individual generator as we are done with it.
+        generator ! PoisonPill
 
         // If all other drivers have met their driveCount, kill the transmitter
-        if (!driveCounters.values.exists(_ <= eventCount)) {
-          eventTransmitter ! PoisonPill
-          context.watch(eventTransmitter)
+        if (!generateCounters.values.exists(_ <= eventCount)) {
+          flowManager ! FlowManager.Shutdown
+          context.watch(flowManager)
         }
       }
 
-    case Terminated(`eventTransmitter`) =>
+    case Terminated(`flowManager`) =>
       // When the eventTransmitter is killed, the system is safe to terminate
       context.system.terminate()
   }

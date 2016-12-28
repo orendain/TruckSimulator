@@ -1,8 +1,7 @@
 package com.hortonworks.orendainx.trucking.simulator.coordinators
 
 import akka.actor.{ActorLogging, ActorRef, Props}
-import com.hortonworks.orendainx.trucking.simulator.actors.DrivingAgent
-import com.hortonworks.orendainx.trucking.simulator.models.Driver
+import com.hortonworks.orendainx.trucking.simulator.generators.DataGenerator
 import com.typesafe.config.Config
 
 import scala.collection.mutable
@@ -13,30 +12,27 @@ import scala.collection.mutable
 object ManualCoordinator {
   case object Tick
 
-  def props(drivers: Seq[Driver], depot: ActorRef, eventTransmitter: ActorRef)(implicit config: Config) =
-    Props(new ManualCoordinator(drivers, depot, eventTransmitter))
+  def props(generators: Seq[ActorRef])(implicit config: Config) =
+    Props(new ManualCoordinator(generators))
 }
 
-class ManualCoordinator(drivers: Seq[Driver], depot: ActorRef, eventTransmitter: ActorRef)(implicit config: Config) extends DriverCoordinator with ActorLogging {
+class ManualCoordinator(generators: Seq[ActorRef])(implicit config: Config) extends DriverCoordinator with ActorLogging {
 
-  // For receive messages and an execution context
+  // For receive messages
   import DriverCoordinator._
   import ManualCoordinator._
 
-  // Create new drivers and set all drivers as ready
-  val drivingAgents = drivers.map { driver => context.actorOf(DrivingAgent.props(driver, depot, eventTransmitter)) }
-  val drivingAgentsReady = mutable.Set(drivingAgents: _*)
+  // Set all generators as ready
+  val generatorsReady = mutable.Set(generators: _*)
 
   def receive = {
     case AcknowledgeTick(drivingAgent) =>
-      drivingAgentsReady += drivingAgent
-      log.debug(s"Someone acknowledged tick - total: ${drivingAgentsReady.size}")
+      generatorsReady += drivingAgent
+      log.debug(s"Generator acknowledged tick - total: ${generatorsReady.size}")
 
     case Tick =>
-      drivingAgentsReady.foreach { drivingAgent =>
-        drivingAgent ! DrivingAgent.Drive
-      }
-      drivingAgentsReady.clear()
+      generatorsReady.foreach(_ ! DataGenerator.GenerateData)
+      generatorsReady.clear()
   }
 
 }

@@ -1,10 +1,12 @@
 package com.hortonworks.orendainx.trucking.simulator
 
-import akka.actor.{ActorRef, ActorSystem}
-import com.hortonworks.orendainx.trucking.simulator.actors.TruckAndRouteDepot
-import com.hortonworks.orendainx.trucking.simulator.coordinators.{AutomaticCoordinator, ManualCoordinator}
+import akka.actor.{ActorRef, ActorSystem, Inbox}
+import com.hortonworks.orendainx.trucking.simulator.coordinators.ManualCoordinator
+import com.hortonworks.orendainx.trucking.simulator.depots.NoSharingDepot
+import com.hortonworks.orendainx.trucking.simulator.flows.{SharedFlowManager, TruckEventAndTrafficFlowManager}
+import com.hortonworks.orendainx.trucking.simulator.generators.TruckAndTrafficGenerator
 import com.hortonworks.orendainx.trucking.simulator.models.{Driver, DrivingPattern}
-import com.hortonworks.orendainx.trucking.simulator.transmitters.AccumulateTransmitter
+import com.hortonworks.orendainx.trucking.simulator.transmitters.{AccumulateTransmitter, ActorTransmitter}
 import com.typesafe.config.ConfigFactory
 
 import scala.collection.JavaConversions._
@@ -13,6 +15,12 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 /**
+  * A simulator ideal for use by a NiFi processor.
+  *
+  * This simulator:
+  * - Exposes a [[ManualCoordinator]] that can be ticked manually for controlled scheduling.
+  * - Exposes an [[akka.actor.Inbox]] that receives all generated [[com.hortonworks.orendainx.trucking.shared.models.TruckingData]].
+  *
   * @author Edgar Orendain <edgar@orendainx.com>
   */
 object NiFiSimulator {
@@ -25,17 +33,26 @@ class NiFiSimulator {
   val system = ActorSystem("NiFiSimulator")
 
   // Create the depot and generate the drivers in the simulation
-  private val depot = system.actorOf(TruckAndRouteDepot.props())
+  private val depot = system.actorOf(NoSharingDepot.props())
   private val drivers = generateDrivers()
 
+  //val truckTransmitter: ActorRef = system.actorOf(AccumulateTransmitter.props())
+  //val trafficTransmitter: ActorRef = system.actorOf(AccumulateTransmitter.props())
+  //val flowManager = system.actorOf(TruckEventAndTrafficFlowManager.props(truckTransmitter, trafficTransmitter))
+
+  val inbox = Inbox.create(system)
+
+  private val transmitter = system.actorOf(ActorTransmitter.props(inbox.getRef()))
+  private val flowManager = system.actorOf(SharedFlowManager.props(transmitter))
+  private val dataGenerators = drivers.map { driver => system.actorOf(TruckAndTrafficGenerator.props(driver, depot, flowManager)) }
+
   // Create the transmitter and coordinator, set to public
-  val transmitter: ActorRef = system.actorOf(AccumulateTransmitter.props())
-  val coordinator: ActorRef = system.actorOf(ManualCoordinator.props(drivers, depot, transmitter))
+  val coordinator: ActorRef = system.actorOf(ManualCoordinator.props(dataGenerators))
 
   // Ensure that the actor system is properly terminated when the simulator is shutdown.
   scala.sys.addShutdownHook {
     system.terminate()
-    Await.result(system.whenTerminated, 15.seconds)
+    Await.result(system.whenTerminated, 10.seconds)
   }
 
   def stop(): Unit = {

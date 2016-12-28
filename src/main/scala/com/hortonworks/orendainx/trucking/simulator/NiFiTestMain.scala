@@ -19,6 +19,25 @@ object NiFiTestMain {
 }
 
 class NiFiTestMain {
+  val sim = NiFiSimulator()
+
+  def init() = {
+    sim.coordinator ! ManualCoordinator.Tick
+  }
+
+  def onTrigger() = {
+    val lst = sim.inbox.receive(1.second)
+
+    lst match {
+      case events: List[_] =>
+        events.foreach { event =>
+          println(event)
+        }
+    }
+
+    sim.coordinator ! ManualCoordinator.Tick
+  }
+  /*
   lazy val config = ConfigFactory.load()
   lazy val simulator = NiFiSimulator()
   lazy val inbox = Inbox.create(simulator.system)
@@ -51,5 +70,5 @@ class NiFiTestMain {
 
     // Fetch the results to be retrieved by onTrigger's next invocation
     //simulator.transmitter ! AccumulateTransmitter.Fetch
-  }
+  }*/
 }
