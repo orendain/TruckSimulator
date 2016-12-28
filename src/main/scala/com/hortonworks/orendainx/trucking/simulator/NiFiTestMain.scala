@@ -26,7 +26,7 @@ class NiFiTestMain {
   }
 
   def onTrigger() = {
-    val lst = sim.inbox.receive(1.second)
+    val lst = sim.fetch()
 
     lst match {
       case events: List[_] =>

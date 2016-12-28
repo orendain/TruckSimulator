@@ -1,6 +1,7 @@
 package com.hortonworks.orendainx.trucking.simulator
 
 import akka.actor.{ActorRef, ActorSystem, Inbox}
+import com.hortonworks.orendainx.trucking.shared.models.TruckingData
 import com.hortonworks.orendainx.trucking.simulator.coordinators.ManualCoordinator
 import com.hortonworks.orendainx.trucking.simulator.depots.NoSharingDepot
 import com.hortonworks.orendainx.trucking.simulator.flows.{SharedFlowManager, TruckEventAndTrafficFlowManager}
@@ -40,9 +41,9 @@ class NiFiSimulator {
   //val trafficTransmitter: ActorRef = system.actorOf(AccumulateTransmitter.props())
   //val flowManager = system.actorOf(TruckEventAndTrafficFlowManager.props(truckTransmitter, trafficTransmitter))
 
-  val inbox = Inbox.create(system)
+  private val inbox = Inbox.create(system)
 
-  private val transmitter = system.actorOf(ActorTransmitter.props(inbox.getRef()))
+  private val transmitter = system.actorOf(AccumulateTransmitter.props())
   private val flowManager = system.actorOf(SharedFlowManager.props(transmitter))
   private val dataGenerators = drivers.map { driver => system.actorOf(TruckAndTrafficGenerator.props(driver, depot, flowManager)) }
 
@@ -53,6 +54,11 @@ class NiFiSimulator {
   scala.sys.addShutdownHook {
     system.terminate()
     Await.result(system.whenTerminated, 10.seconds)
+  }
+
+  def fetch(): List[TruckingData] = {
+    inbox.send(transmitter, AccumulateTransmitter.Fetch)
+    inbox.receive(1.second).asInstanceOf[List[TruckingData]]
   }
 
   def stop(): Unit = {
