@@ -14,6 +14,9 @@ import scala.collection.mutable.ListBuffer
   * A parser for a directory storing Route files (.route extension).
   * When parsing the base directory, RouteReader traverses recursively into directories in search of every route file.
   *
+  * After a series of headaches (hehe), this class can now process routes stored in traditional filesystems or
+  * jar-packaged filesystems (when this library is leveraged either as a JAR or as a compiled part of a larger system).
+  *
   * @author Edgar Orendain <edgar@orendainx.com>
   */
 object RouteParser {
@@ -27,7 +30,7 @@ object RouteParser {
     //log.debug(s"path: $path")
     //new RouteParser(path)
 
-    // TODO: Cleanup
+    // TODO: Cleanup!
     val path = s"${getClass.getResource("/routes").getPath}/$routeDirectory"
     log.debug(s"1 $path")
     if (path.startsWith("file")) { // is a jar file

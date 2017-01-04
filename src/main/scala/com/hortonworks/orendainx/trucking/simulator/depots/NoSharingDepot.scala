@@ -10,6 +10,12 @@ import com.typesafe.config.Config
 import scala.util.Random
 
 /**
+  * This implementation of a [[ResourceDepot]] disallows [[com.hortonworks.orendainx.trucking.simulator.generators.DataGenerator]]
+  * objects from sharing resources.  That is, any resource managed by this depot can only be checked out by a single generator.
+  *
+  * Sending a [[ResourceDepot.RequestRoute]] or [[ResourceDepot.RequestTruck]] message will return a new resource (that is different
+  * than the one specified as an argument in that message) as soon as one is available.
+  *
   * @author Edgar Orendain <edgar@orendainx.com>
   */
 object NoSharingDepot {
