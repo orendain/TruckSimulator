@@ -79,7 +79,7 @@ object RouteParser {
 
   // Define Scanner parser for Location
   private implicit val locationParser: Scannable[Location] = Scannable { scanner =>
-    Location(scanner.next[String], scanner.next[String])
+    Location(scanner.next[Double], scanner.next[Double])
   }
 }
 

@@ -1,10 +1,11 @@
 package com.hortonworks.orendainx.trucking.simulator.generators
 
 import java.sql.Timestamp
+import java.time.Instant
 import java.util.Date
 
 import akka.actor.{ActorLogging, ActorRef, Props, Stash}
-import com.hortonworks.orendainx.trucking.shared.models.{TrafficData, TruckEvent, TruckEventTypes}
+import com.hortonworks.orendainx.trucking.shared.models.{TrafficData, TruckData, TruckDataTypes}
 import com.hortonworks.orendainx.trucking.simulator.coordinators.GeneratorCoordinator
 import com.hortonworks.orendainx.trucking.simulator.depots.ResourceDepot.{RequestRoute, RequestTruck, ReturnRoute, ReturnTruck}
 import com.hortonworks.orendainx.trucking.simulator.generators.DataGenerator.{GenerateData, NewResource}
@@ -15,7 +16,7 @@ import com.typesafe.config.Config
 import scala.util.Random
 
 /**
-  * TruckAndTrafficGenerator generates two types of data: [[TruckEvent]] and [[TrafficData]] and transmits to the
+  * TruckAndTrafficGenerator generates two types of data: [[TruckData]] and [[TrafficData]] and transmits to the
   * specified [[com.hortonworks.orendainx.trucking.simulator.flows.FlowManager]].
   *
   * @author Edgar Orendain <edgar@orendainx.com>
@@ -83,16 +84,16 @@ class TruckAndTrafficGenerator(driver: Driver, depot: ActorRef, flowManager: Act
       val speed =
         driver.drivingPattern.minSpeed + Random.nextInt(driver.drivingPattern.maxSpeed - driver.drivingPattern.minSpeed + 1)
 
-      // If driver is speeding or is set to trigger risky behavior, generate an appropriate TruckEventType
+      // If driver is speeding or is set to trigger risky behavior, generate an appropriate TruckDataType
       val eventType =
         if (speed >= SpeedingThreshold || driveCount % driver.drivingPattern.riskFrequency == 0)
-          TruckEventTypes.AllTypes(Random.nextInt(TruckEventTypes.AllTypes.length))
+          TruckDataTypes.NonNormalTypes(Random.nextInt(TruckDataTypes.NonNormalTypes.length))
         else
-          TruckEventTypes.Normal
+          TruckDataTypes.Normal
 
       // Create trucking event and transmit it
-      val eventTime = new Timestamp(new Date().getTime)
-      val event = TruckEvent(eventTime, truck.id, driver.id, driver.name,
+      val eventTime = Instant.now().toEpochMilli
+      val event = TruckData(eventTime, truck.id, driver.id, driver.name,
         route.id, route.name, currentLoc.latitude, currentLoc.longitude, speed, eventType)
       flowManager ! Transmit(event)
 

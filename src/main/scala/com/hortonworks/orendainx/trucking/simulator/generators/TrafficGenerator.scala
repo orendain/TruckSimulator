@@ -1,6 +1,7 @@
 package com.hortonworks.orendainx.trucking.simulator.generators
 
 import java.sql.Timestamp
+import java.time.Instant
 import java.util.Date
 
 import akka.actor.{ActorLogging, ActorRef, Props, Stash}
@@ -60,8 +61,7 @@ class TrafficGenerator(depot: ActorRef, flowManager: ActorRef)(implicit config: 
       routes.foreach { route =>
         // Create traffic data and emit it
         congestionLevel += Random.nextInt(11) - 5 // -5 to 5
-        val eventTime = new Timestamp(new Date().getTime)
-        val traffic = TrafficData(eventTime, route.id, congestionLevel)
+        val traffic = TrafficData(Instant.now().toEpochMilli, route.id, congestionLevel)
         flowManager ! Transmit(traffic)
       }
 

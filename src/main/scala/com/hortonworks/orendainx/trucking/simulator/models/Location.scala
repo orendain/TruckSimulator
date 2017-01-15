@@ -5,4 +5,4 @@ package com.hortonworks.orendainx.trucking.simulator.models
   *
   * @author Edgar Orendain <edgar@orendainx.com>
   */
-case class Location(latitude: String, longitude: String)
+case class Location(latitude: Double, longitude: Double)
