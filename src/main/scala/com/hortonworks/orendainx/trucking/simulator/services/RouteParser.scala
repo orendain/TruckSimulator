@@ -21,6 +21,7 @@ import scala.collection.mutable.ListBuffer
   */
 object RouteParser {
 
+  // TODO: if a routefile is incorrectly formatted, entire system goes down.  change this.
   val log = Logger(getClass)
 
   def apply(routeDirectory: String): RouteParser = {
